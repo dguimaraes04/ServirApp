@@ -1677,11 +1677,10 @@ function ScheduleView() {
               
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {ministries
-                    .filter(min => currentUserRole === 'manager' || leadMinistriesIds.includes(min.id))
-                    .map(min => {
+                  {ministries.map(min => {
                     const schedule = schedules.find(s => s.event_id === event.id && s.ministry_id === min.id);
                     const volsInMin = scheduleVolunteers.filter(sv => sv.schedule_id === schedule?.id);
+                    const canEdit = currentUserRole === 'manager' || leadMinistriesIds.includes(min.id);
                     
                     return (
                       <div key={min.id} className="bg-navy-950/40 border border-navy-800 rounded-2xl p-4 hover:border-navy-700 transition-all">
@@ -1690,12 +1689,18 @@ function ScheduleView() {
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: min.color }} />
                             <span className="text-sm font-black text-white uppercase tracking-tighter">{min.name}</span>
                           </div>
-                          <button 
-                            onClick={() => openScheduleModal(event, min)}
-                            className="text-[10px] font-black uppercase text-accent-cyan hover:text-white transition-colors"
-                          >
-                            {schedule ? 'Editar' : 'Montar'}
-                          </button>
+                          {canEdit ? (
+                            <button 
+                              onClick={() => openScheduleModal(event, min)}
+                              className="text-[10px] font-black uppercase text-accent-cyan hover:text-white transition-colors"
+                            >
+                              {schedule ? 'Editar' : 'Montar'}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-bold uppercase text-slate-600 flex items-center gap-1">
+                              Apenas Ver
+                            </span>
+                          )}
                         </div>
                         
                         <div className="space-y-2 min-h-[40px]">
