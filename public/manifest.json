@@ -1,6 +1,6 @@
 {
-  "name": "ServirApp",
-  "short_name": "ServirApp",
+  "name": "Church+",
+  "short_name": "Church+",
   "description": "Gestão inteligente de voluntários para igrejas.",
   "start_url": "/",
   "display": "standalone",

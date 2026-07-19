@@ -133,13 +133,11 @@ export function Auth() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="w-full max-w-md"
         >
-          {/* Logo Placeholder */}
+          {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-accent-cyan rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(100,255,218,0.3)] mb-4 relative group">
-              <div className="absolute inset-0 bg-accent-cyan rounded-2xl blur-md opacity-50 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <ShieldCheck className="text-navy-950 w-8 h-8 relative z-10" />
+            <div className="w-48 h-16 flex items-center justify-center mb-2">
+              <img src="/church_full.png" alt="Church+" className="h-full object-contain" />
             </div>
-            <h1 className="text-3xl md:text-4xl font-display font-extrabold text-white tracking-tighter mb-2">ServirApp</h1>
             <p className="text-slate-gray text-center font-medium text-sm md:text-base">Gestão inteligente para o corpo de Cristo.</p>
           </div>
 
@@ -326,7 +324,7 @@ export function Auth() {
           </div>
           
           <p className="text-center text-xs text-slate-gray/60 mt-8 font-medium">
-            © {new Date().getFullYear()} ServirApp. Todos os direitos reservados.
+            © {new Date().getFullYear()} Church+. Todos os direitos reservados.
           </p>
         </motion.div>
       </div>

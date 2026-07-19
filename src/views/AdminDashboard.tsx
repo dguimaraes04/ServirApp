@@ -134,15 +134,8 @@ export function AdminDashboard() {
         <div className="p-8">
           <div className="flex items-center justify-between mb-12">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-accent-cyan rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(100,255,218,0.2)]">
-                <ShieldCheck className="text-navy-950 w-7 h-7" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-display font-extrabold text-white tracking-tighter leading-none">ServirApp</h1>
-                <div className="flex items-center gap-1 mt-1">
-                  <div className="w-1 h-1 rounded-full bg-accent-cyan"></div>
-                  <p className="text-[10px] text-accent-cyan uppercase tracking-widest font-black">Admin Panel</p>
-                </div>
+              <div className="h-10 flex items-center justify-start">
+                <img src="/church_full.png" alt="Church+" className="h-full object-contain" />
               </div>
             </div>
             <button className="lg:hidden text-slate-gray" onClick={() => setSidebarOpen(false)}>
