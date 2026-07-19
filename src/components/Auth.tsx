@@ -70,8 +70,10 @@ export function Auth() {
         });
 
         if (authError) throw authError;
-        setSuccessMsg(`Igreja criada com sucesso! O Código de Convite da sua igreja é: ${newCode}. Faça login agora.`);
-        setMode('login'); // Retorna pro login
+        // Force sign out so user lands on login screen cleanly (avoids profile-not-found race condition)
+        await supabase.auth.signOut();
+        setSuccessMsg(`✅ Igreja criada! Código de convite da sua igreja: ${newCode}. Agora faça login com o e-mail e senha que você acabou de criar.`);
+        setMode('login');
       } 
       
       else if (mode === 'register_volunteer') {
@@ -102,7 +104,9 @@ export function Auth() {
         });
 
         if (authError) throw authError;
-        setSuccessMsg(`Bem-vindo à ${churchData.name}! Conta criada com sucesso. Faça login agora.`);
+        // Force sign out so user lands on login screen cleanly (avoids profile-not-found race condition)
+        await supabase.auth.signOut();
+        setSuccessMsg(`✅ Bem-vindo à ${churchData.name}! Conta criada. Agora faça login com o e-mail e senha que você acabou de criar.`);
         setMode('login');
       }
     } catch (err: any) {
