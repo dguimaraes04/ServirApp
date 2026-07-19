@@ -134,8 +134,8 @@ export function AdminDashboard() {
         <div className="p-8">
           <div className="flex items-center justify-between mb-12">
             <div className="flex items-center gap-3">
-              <div className="h-10 flex items-center justify-start">
-                <img src="/church_full.png" alt="Church+" className="h-full object-contain" />
+              <div className="w-36 h-12 flex items-center justify-start overflow-hidden relative">
+                <img src="/church_full.png" alt="Church+" className="w-full h-full object-contain scale-175 -ml-4" />
               </div>
             </div>
             <button className="lg:hidden text-slate-gray" onClick={() => setSidebarOpen(false)}>

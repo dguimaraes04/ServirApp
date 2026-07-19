@@ -134,11 +134,11 @@ export function Auth() {
           className="w-full max-w-md"
         >
           {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-48 h-16 flex items-center justify-center mb-2">
-              <img src="/church_full.png" alt="Church+" className="h-full object-contain" />
+          <div className="flex flex-col items-center -mt-6 -mb-6">
+            <div className="w-64 h-48 flex items-center justify-center overflow-hidden">
+              <img src="/church_full.png" alt="Church+" className="w-full h-full object-contain scale-175" />
             </div>
-            <p className="text-slate-gray text-center font-medium text-sm md:text-base">Gestão inteligente para o corpo de Cristo.</p>
+            <p className="text-slate-gray text-center font-medium text-sm md:text-base -mt-6 mb-8">Gestão inteligente para o corpo de Cristo.</p>
           </div>
 
           <div className="glass-card p-6 md:p-8 rounded-3xl border border-navy-800 bg-navy-900/60 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
