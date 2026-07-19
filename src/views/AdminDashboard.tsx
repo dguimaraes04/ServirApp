@@ -1303,65 +1303,70 @@ function MinistriesView() {
                     <p className="text-slate-gray">Nenhum membro vinculado a este ministério ainda.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-navy-800 rounded-2xl bg-navy-900/30">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-navy-800/50 border-b border-navy-700">
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-gray uppercase tracking-widest">Membro</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-gray uppercase tracking-widest">Função</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-gray uppercase tracking-widest text-right">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-navy-800">
-                        {members.map(member => (
-                          <tr key={member.id} className="hover:bg-navy-800/30 transition-colors group">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-navy-800 flex items-center justify-center text-accent-cyan font-bold border border-navy-700 group-hover:border-accent-cyan/50 transition-all overflow-hidden">
-                                  {member.avatar_url
-                                    ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
-                                    : member.full_name?.charAt(0)
-                                  }
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-white group-hover:text-accent-cyan transition-colors">{member.full_name}</p>
-                                  <p className="text-[10px] text-slate-gray">{member.role === 'manager' ? 'Administrador' : 'Voluntário'}</p>
-                                </div>
+                  <div className="space-y-2">
+                    {/* Desktop: Table Header */}
+                    <div className="hidden sm:grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-2">
+                      <span className="text-[10px] font-black text-slate-gray uppercase tracking-widest">Membro</span>
+                      <span className="text-[10px] font-black text-slate-gray uppercase tracking-widest">Função</span>
+                      <span className="text-[10px] font-black text-slate-gray uppercase tracking-widest text-right pr-2">Ações</span>
+                    </div>
+
+                    {members.map(member => (
+                      <div
+                        key={member.id}
+                        className="bg-navy-900/50 border border-navy-800 rounded-2xl p-4 hover:border-navy-700 transition-all"
+                      >
+                        {/* Mobile layout: stacked */}
+                        <div className="flex items-start justify-between gap-3">
+                          {/* Avatar + Name */}
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-navy-800 flex items-center justify-center text-accent-cyan font-bold border border-navy-700 overflow-hidden">
+                              {member.avatar_url
+                                ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                                : member.full_name?.charAt(0)
+                              }
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white truncate">{member.full_name}</p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                  member.type === 'Líder' 
+                                    ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20' 
+                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                }`}>
+                                  {member.type}
+                                </span>
+                                <span className="text-[10px] text-slate-gray">
+                                  {member.role === 'manager' ? 'Administrador' : 'Voluntário'}
+                                </span>
                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md ${
-                                member.type === 'Líder' ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20' : 'bg-slate-800 text-slate-400 border border-slate-700'
-                              }`}>
-                                {member.type}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button 
-                                  onClick={() => handleToggleLeader(member.id, member.type === 'Líder')}
-                                  title={member.type === 'Líder' ? 'Remover Liderança' : 'Promover a Líder'}
-                                  className={`p-2 rounded-lg transition-all ${
-                                    member.type === 'Líder' 
-                                      ? 'text-red-400 hover:bg-red-500/10' 
-                                      : 'text-accent-cyan hover:bg-accent-cyan/10'
-                                  }`}
-                                >
-                                  {member.type === 'Líder' ? <UserMinus size={18} /> : <Crown size={18} />}
-                                </button>
-                                <button 
-                                  onClick={() => handleRemoveMember(member.id)}
-                                  title="Remover do Ministério"
-                                  className="p-2 rounded-lg text-slate-gray hover:text-red-500 hover:bg-red-500/10 transition-all"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons — always visible */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => handleToggleLeader(member.id, member.type === 'Líder')}
+                              title={member.type === 'Líder' ? 'Remover Liderança' : 'Promover a Líder'}
+                              className={`p-2.5 rounded-xl transition-all ${
+                                member.type === 'Líder'
+                                  ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
+                                  : 'text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20'
+                              }`}
+                            >
+                              {member.type === 'Líder' ? <UserMinus size={18} /> : <Crown size={18} />}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveMember(member.id)}
+                              title="Remover do Ministério"
+                              className="p-2.5 rounded-xl text-slate-gray bg-navy-800 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
