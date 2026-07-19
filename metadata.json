@@ -1,0 +1,6 @@
+{
+  "name": "ServirApp",
+  "description": "Sistema de gestão de escalas de voluntários para ministérios de igrejas, com detecção de conflitos e matriz de competências.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
