@@ -24,7 +24,8 @@ import {
   ArrowLeft,
   Sun,
   Moon,
-  Globe
+  Globe,
+  Megaphone
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
@@ -35,7 +36,17 @@ export function VolunteerApp() {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isSetlistModalOpen, setIsSetlistModalOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<'schedules' | 'songs' | 'profile'>('schedules');
+  const [currentView, setCurrentView] = useState<'schedules' | 'announcements' | 'songs' | 'profile'>('schedules');
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [leadMinistriesIds, setLeadMinistriesIds] = useState<string[]>([]);
+  const [isNewAnnouncementModalOpen, setIsNewAnnouncementModalOpen] = useState(false);
+  const [anonTitle, setAnonTitle] = useState('');
+  const [anonContent, setAnonContent] = useState('');
+  const [anonPriority, setAnonPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
+  const [anonTargetMinistryId, setAnonTargetMinistryId] = useState<string>('');
+  const [isSubmittingAnon, setIsSubmittingAnon] = useState(false);
+  const [allChurchMinistries, setAllChurchMinistries] = useState<any[]>([]);
   const [userMinistries, setUserMinistries] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
   const [isWorshipMember, setIsWorshipMember] = useState(false);
@@ -118,8 +129,22 @@ export function VolunteerApp() {
         if (profile) {
           setUserProfile(profile);
           setChurchId(profile.church_id);
+          setUserRole(profile.role);
           setNewFullName(profile.full_name || '');
           setNewAvatarUrl(profile.avatar_url || '');
+
+          const [{ data: annons }, { data: allMins }, { data: myMins }] = await Promise.all([
+            supabase.from('announcements')
+              .select('*, author:profiles(*), ministry:ministries(*)')
+              .eq('church_id', profile.church_id)
+              .order('created_at', { ascending: false }),
+            supabase.from('ministries').select('*').eq('church_id', profile.church_id).order('name'),
+            supabase.from('ministry_leaders').select('ministry_id').eq('profile_id', currentSession.user.id)
+          ]);
+
+          if (annons) setAnnouncements(annons);
+          if (allMins) setAllChurchMinistries(allMins);
+          if (myMins) setLeadMinistriesIds(myMins.map(m => m.ministry_id));
         }
 
         const { data: userMins } = await supabase
@@ -431,6 +456,48 @@ export function VolunteerApp() {
       alert('Erro ao salvar música no repertório.');
     } finally {
       setIsCreatingVolOnlineSong(false);
+    }
+  };
+
+  const visibleAnnouncements = useMemo(() => {
+    if (userRole === 'manager') return announcements;
+    const myMinIds = userMinistries.map((m: any) => m.id);
+    const myLedIds = leadMinistriesIds;
+    
+    return announcements.filter(a => {
+      if (!a.ministry_id) return true; // Geral da Igreja
+      return myMinIds.includes(a.ministry_id) || myLedIds.includes(a.ministry_id);
+    });
+  }, [announcements, userRole, userMinistries, leadMinistriesIds]);
+
+  const handlePublishVolAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!anonTitle.trim() || !anonContent.trim() || !churchId || !session?.user?.id) return;
+    setIsSubmittingAnon(true);
+    try {
+      const payload = {
+        church_id: churchId,
+        author_id: session.user.id,
+        ministry_id: anonTargetMinistryId || null,
+        title: anonTitle.trim(),
+        content: anonContent.trim(),
+        priority: anonPriority
+      };
+
+      const { error } = await supabase.from('announcements').insert(payload);
+      if (error) throw error;
+
+      setAnonTitle('');
+      setAnonContent('');
+      setAnonPriority('normal');
+      setAnonTargetMinistryId('');
+      setIsNewAnnouncementModalOpen(false);
+      fetchMySchedules(false);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao publicar aviso.');
+    } finally {
+      setIsSubmittingAnon(false);
     }
   };
 
@@ -870,6 +937,106 @@ export function VolunteerApp() {
               </motion.div>
             )}
 
+            {currentView === 'announcements' && (
+              <motion.div key="announcements" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}>
+                <div className="space-y-4 pb-20">
+                  <div className="flex justify-between items-center mb-2">
+                    <div>
+                      <h2 className="text-xl font-display font-black uppercase tracking-tight" style={{ color: 'var(--text-heading)' }}>
+                        Mural de Avisos
+                      </h2>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Recados oficiais dos ministérios e da igreja.</p>
+                    </div>
+
+                    {(userRole === 'manager' || userRole === 'leader' || leadMinistriesIds.length > 0) && (
+                      <button
+                        onClick={() => {
+                          const options = userRole === 'manager' 
+                            ? [{ id: '', name: '📢 Todos os Voluntários' }, ...allChurchMinistries.map(m => ({ id: m.id, name: `🏛️ ${m.name}` }))]
+                            : allChurchMinistries.filter(m => leadMinistriesIds.includes(m.id)).map(m => ({ id: m.id, name: `🏛️ ${m.name}` }));
+                          
+                          if (options.length > 0) setAnonTargetMinistryId(options[0].id);
+                          setIsNewAnnouncementModalOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border shadow-sm"
+                        style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}
+                      >
+                        <Plus size={14} /> Criar Aviso
+                      </button>
+                    )}
+                  </div>
+
+                  {visibleAnnouncements.length === 0 ? (
+                    <div className="py-16 border-2 border-dashed rounded-3xl text-center space-y-3" style={{ borderColor: 'var(--border-main)' }}>
+                      <Megaphone size={36} className="mx-auto opacity-30" style={{ color: 'var(--text-secondary)' }} />
+                      <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhum aviso no momento.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {visibleAnnouncements.map((item: any) => {
+                        let priorityBadge = { bg: 'bg-blue-500/10 text-blue-500 border-blue-500/20', text: '📌 AVISO' };
+                        if (item.priority === 'urgent') priorityBadge = { bg: 'bg-red-500/15 text-red-500 border-red-500/30', text: '🚨 URGENTE' };
+                        if (item.priority === 'important') priorityBadge = { bg: 'bg-amber-500/15 text-amber-500 border-amber-500/30', text: '⚠️ IMPORTANTE' };
+
+                        const isManagerOrAuthor = userRole === 'manager' || item.author_id === session?.user?.id;
+
+                        return (
+                          <div key={item.id} className="p-5 rounded-3xl space-y-3 border glass-card" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}>
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${priorityBadge.bg}`}>
+                                  {priorityBadge.text}
+                                </span>
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                                  {item.ministry ? `🏛️ ${item.ministry.name}` : '📢 Geral (Todos)'}
+                                </span>
+                              </div>
+
+                              {isManagerOrAuthor && (
+                                <button 
+                                  onClick={async () => {
+                                    if (window.confirm('Excluir este aviso?')) {
+                                      await supabase.from('announcements').delete().eq('id', item.id);
+                                      fetchMySchedules(false);
+                                    }
+                                  }}
+                                  className="p-1 cursor-pointer hover:text-red-500"
+                                  style={{ color: 'var(--text-secondary)' }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+
+                            <div>
+                              <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-heading)' }}>{item.title}</h3>
+                              <p className="text-xs whitespace-pre-line leading-relaxed" style={{ color: 'var(--text-primary)' }}>{item.content}</p>
+                            </div>
+
+                            <div className="pt-3 border-t flex items-center justify-between text-[11px]" style={{ borderColor: 'var(--border-main)' }}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg overflow-hidden border flex items-center justify-center text-[10px] font-black" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                                  {item.author?.avatar_url ? (
+                                    <img src={item.author.avatar_url} alt={item.author.full_name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    item.author?.full_name?.charAt(0) || 'U'
+                                  )}
+                                </div>
+                                <span className="font-bold" style={{ color: 'var(--text-heading)' }}>{item.author?.full_name || 'Membro'}</span>
+                              </div>
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                {new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
             {currentView === 'profile' && (
               <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}>
                 <div className="space-y-6 pb-20">
@@ -1021,6 +1188,20 @@ export function VolunteerApp() {
             <Calendar size={16} /> Escalas
           </button>
           
+          <button 
+            onClick={() => setCurrentView('announcements')}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer relative"
+            style={currentView === 'announcements' 
+              ? { background: 'var(--accent)', color: 'var(--accent-text)' } 
+              : { color: 'var(--text-secondary)', background: 'transparent' }
+            }
+          >
+            <Megaphone size={16} /> Avisos
+            {visibleAnnouncements.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-red-500 absolute top-2 right-2" />
+            )}
+          </button>
+
           {canManageRepertoire && (
             <button 
               onClick={() => setCurrentView('songs')}
@@ -1542,6 +1723,126 @@ export function VolunteerApp() {
                   >
                     {isSubmittingSong ? 'Salvando...' : 'Salvar Música'}
                   </button>
+                </form>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Modal Novo Aviso (Mobile App) */}
+          {isNewAnnouncementModalOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setIsNewAnnouncementModalOpen(false)}
+                className="absolute inset-0 backdrop-blur-sm"
+                style={{ background: 'rgba(5, 12, 22, 0.8)' }}
+              />
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="w-full max-w-sm rounded-3xl p-6 relative z-10 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col glass-card"
+                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)' }}
+              >
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-2">
+                    <Megaphone size={20} style={{ color: 'var(--accent)' }} />
+                    <h3 className="text-xl font-display font-black uppercase tracking-tight" style={{ color: 'var(--text-heading)' }}>Criar Aviso</h3>
+                  </div>
+                  <button onClick={() => setIsNewAnnouncementModalOpen(false)} style={{ color: 'var(--text-secondary)' }} className="cursor-pointer">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handlePublishVolAnnouncement} className="space-y-4 overflow-y-auto pr-1 flex-1 custom-scrollbar">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>Canal / Destino</label>
+                    <select
+                      value={anonTargetMinistryId}
+                      onChange={e => setAnonTargetMinistryId(e.target.value)}
+                      className="w-full text-xs rounded-xl px-3 py-2.5 outline-none border transition-all"
+                      style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                    >
+                      {userRole === 'manager' ? (
+                        <>
+                          <option value="">📢 Todos os Voluntários</option>
+                          {allChurchMinistries.map(m => (
+                            <option key={m.id} value={m.id}>🏛️ {m.name}</option>
+                          ))}
+                        </>
+                      ) : (
+                        allChurchMinistries.filter(m => leadMinistriesIds.includes(m.id)).map(m => (
+                          <option key={m.id} value={m.id}>🏛️ {m.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>Prioridade</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAnonPriority('normal')}
+                        className={`py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all cursor-pointer ${
+                          anonPriority === 'normal' ? 'bg-blue-600 text-white border-blue-500' : 'opacity-60'
+                        }`}
+                      >
+                        📌 Normal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAnonPriority('important')}
+                        className={`py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all cursor-pointer ${
+                          anonPriority === 'important' ? 'bg-amber-600 text-white border-amber-500' : 'opacity-60'
+                        }`}
+                      >
+                        ⚠️ Importante
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAnonPriority('urgent')}
+                        className={`py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all cursor-pointer ${
+                          anonPriority === 'urgent' ? 'bg-red-600 text-white border-red-500' : 'opacity-60'
+                        }`}
+                      >
+                        🚨 Urgente
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>Título *</label>
+                    <input
+                      type="text"
+                      required
+                      value={anonTitle}
+                      onChange={e => setAnonTitle(e.target.value)}
+                      placeholder="Título do recado"
+                      className="w-full text-xs rounded-xl px-3 py-2.5 outline-none border transition-all"
+                      style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>Mensagem *</label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={anonContent}
+                      onChange={e => setAnonContent(e.target.value)}
+                      placeholder="Escreva a mensagem..."
+                      className="w-full text-xs rounded-xl px-3 py-2.5 outline-none border transition-all resize-none"
+                      style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-main)' }}>
+                    <button type="button" onClick={() => setIsNewAnnouncementModalOpen(false)} className="flex-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer" style={{ color: 'var(--text-secondary)' }}>Cancelar</button>
+                    <button type="submit" disabled={isSubmittingAnon} className="flex-1 btn-primary text-xs cursor-pointer">
+                      {isSubmittingAnon ? 'Publicando...' : 'Publicar'}
+                    </button>
+                  </div>
                 </form>
               </motion.div>
             </div>
