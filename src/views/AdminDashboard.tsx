@@ -31,7 +31,9 @@ import {
   CalendarDays,
   ChevronLeft,
   RefreshCw,
-  Repeat
+  Repeat,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -50,6 +52,7 @@ import { Volunteer, Ministry, Event, Schedule } from '../types';
 import { MOCK_VOLUNTEERS, MOCK_MINISTRIES, MOCK_EVENTS, MOCK_SCHEDULES } from '../mockData';
 import { formatDateTime, checkConflicts } from '../utils';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../contexts/ThemeContext';
 
 type View = 'dashboard' | 'volunteers' | 'ministries' | 'schedule' | 'songs' | 'profile';
 
@@ -118,7 +121,7 @@ export function AdminDashboard() {
   const pendingConfirms = useMemo(() => schedules.filter(s => s.status === 'pending').length, [schedules]);
 
   return (
-    <div className="flex h-screen bg-navy-950 text-slate-light font-sans antialiased overflow-hidden">
+    <div className="flex h-screen font-sans antialiased overflow-hidden" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -126,14 +129,15 @@ export function AdminDashboard() {
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 backdrop-blur-sm z-40 lg:hidden"
+            style={{ background: 'rgba(5,12,22,0.80)' }}
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 w-72 border-r border-navy-800 bg-navy-950 flex flex-col z-50 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 w-72 flex flex-col z-50 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ background: 'var(--bg-base)', borderRight: '1px solid var(--border-main)' }}>
         <div className="p-8">
           <div className="flex items-center justify-between mb-12">
             <div className="flex items-center gap-3">
@@ -141,7 +145,7 @@ export function AdminDashboard() {
                 <img src="/church_full.png" alt="Church+" className="w-full h-full object-contain scale-175 -ml-4" />
               </div>
             </div>
-            <button className="lg:hidden text-slate-gray" onClick={() => setSidebarOpen(false)}>
+            <button className="lg:hidden" style={{ color: 'var(--text-secondary)' }} onClick={() => setSidebarOpen(false)}>
               <Menu />
             </button>
           </div>
@@ -182,7 +186,7 @@ export function AdminDashboard() {
           </nav>
         </div>
 
-        <div className="mt-auto p-8 border-t border-navy-800">
+        <div className="mt-auto p-8" style={{ borderTop: '1px solid var(--border-main)' }}>
           <NavItem icon={<Settings size={20} />} label="Configurações" />
         </div>
       </aside>
@@ -190,52 +194,54 @@ export function AdminDashboard() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Header */}
-        <header className="h-20 border-b border-navy-800 bg-navy-900/50 backdrop-blur-xl flex items-center justify-between px-6 lg:px-10 relative z-10">
+        <header className="h-20 backdrop-blur-xl flex items-center justify-between px-6 lg:px-10 relative z-10" style={{ borderBottom: '1px solid var(--border-main)', background: 'var(--bg-elevated)' }}>
           <div className="flex items-center gap-4">
-            <Menu className="lg:hidden text-slate-gray cursor-pointer" onClick={() => setSidebarOpen(true)} />
+            <Menu className="lg:hidden cursor-pointer" style={{ color: 'var(--text-secondary)' }} onClick={() => setSidebarOpen(true)} />
             <div className="relative w-full max-w-xs hidden sm:block">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-gray" size={18} />
-              <input 
-                type="text" 
-                placeholder="Busca inteligente..." 
-                className="w-full bg-navy-950/50 border border-navy-800 rounded-xl py-2.5 pl-12 pr-4 text-sm focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-white placeholder:text-slate-gray/50"
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-secondary)' }} size={18} />
+              <input
+                type="text"
+                placeholder="Busca inteligente..."
+                className="w-full rounded-xl py-2.5 pl-12 pr-4 text-sm outline-none transition-all"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
               />
             </div>
           </div>
 
           <div className="flex items-center gap-4 lg:gap-6">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-accent-cyan/10 border border-accent-cyan/20 rounded-full">
-              <div className="w-1.5 h-1.5 rounded-full bg-accent-cyan animate-pulse"></div>
-              <span className="text-[10px] font-bold text-accent-cyan uppercase tracking-widest">Sistema Operante</span>
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}>
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent)' }}></div>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Sistema Operante</span>
             </div>
             
-            <button className="relative p-2 text-slate-gray hover:text-accent-cyan transition-colors">
+            <button className="relative p-2 transition-colors" style={{ color: 'var(--text-secondary)' }}>
               <Bell size={22} />
               {pendingConfirms > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-3 h-3 bg-red-500 rounded-full border-2 border-navy-900"></span>
+                <span className="absolute top-1.5 right-1.5 w-3 h-3 bg-red-500 rounded-full" style={{ border: '2px solid var(--bg-base)' }}></span>
               )}
             </button>
             
-            <div 
-              className="h-10 w-10 rounded-xl bg-navy-800 border-2 border-navy-700 p-0.5 hover:border-accent-cyan transition-all cursor-pointer relative group"
+            <div
+              className="h-10 w-10 rounded-xl p-0.5 transition-all cursor-pointer relative group"
+              style={{ background: 'var(--bg-surface)', border: '2px solid var(--border-main)' }}
               onClick={() => setCurrentView('profile')}
             >
-              <div className="w-full h-full rounded-lg bg-gradient-to-tr from-accent-cyan to-blue-500 flex items-center justify-center text-navy-950 font-bold text-xs overflow-hidden">
+              <div className="w-full h-full rounded-lg flex items-center justify-center font-bold text-xs overflow-hidden" style={{ background: 'linear-gradient(135deg, var(--accent), #3B82F6)', color: 'var(--accent-text)' }}>
                 {currentUserProfile?.avatar_url ? (
                   <img src={currentUserProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <span>{currentUserProfile?.full_name?.charAt(0).toUpperCase() || 'A'}</span>
                 )}
               </div>
-              <div className="absolute top-full right-0 mt-2 w-max px-3 py-1.5 bg-navy-800 border border-navy-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                <p className="text-xs text-white font-medium">Meu Perfil</p>
+              <div className="absolute top-full right-0 mt-2 w-max px-3 py-1.5 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Meu Perfil</p>
               </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar bg-navy-900/40">
+        <div className="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar" style={{ background: 'var(--bg-base)' }}>
           <AnimatePresence mode="wait">
             <motion.div
               key={currentView}
@@ -3406,6 +3412,7 @@ function ProfileView({ userId, profile, onProfileUpdate, onLogout }: { userId: s
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     if (profile) {
@@ -3417,33 +3424,16 @@ function ProfileView({ userId, profile, onProfileUpdate, onLogout }: { userId: s
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !userId) return;
-
     try {
       setIsUploading(true);
-      
-      // Criar caminho único: userId/timestamp-filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}/${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      // Upload do arquivo
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
       if (uploadError) throw uploadError;
-
-      // Pegar URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
       setAvatarUrl(publicUrl);
-      
-      // Atualizar no perfil imediatamente para feedback visual
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId);
       onProfileUpdate({ ...profile, avatar_url: publicUrl });
-      
       alert('Foto carregada com sucesso!');
     } catch (error: any) {
       alert('Erro no upload: ' + error.message);
@@ -3454,11 +3444,7 @@ function ProfileView({ userId, profile, onProfileUpdate, onLogout }: { userId: s
 
   const handleSave = async () => {
     setIsSaving(true);
-    const { error } = await supabase.from('profiles').update({
-      full_name: fullName,
-      avatar_url: avatarUrl
-    }).eq('id', userId);
-    
+    const { error } = await supabase.from('profiles').update({ full_name: fullName, avatar_url: avatarUrl }).eq('id', userId);
     if (error) {
       alert('Erro ao salvar perfil: ' + error.message);
     } else {
@@ -3468,75 +3454,131 @@ function ProfileView({ userId, profile, onProfileUpdate, onLogout }: { userId: s
     setIsSaving(false);
   };
 
-  if (!profile) return <div className="flex justify-center p-12"><div className="w-8 h-8 border-4 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" /></div>;
+  if (!profile) return (
+    <div className="flex justify-center p-12">
+      <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: 'var(--accent-subtle)', borderTopColor: 'var(--accent)' }} />
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-display font-black text-white uppercase tracking-tighter">Meu Perfil</h2>
-          <p className="text-slate-gray text-sm">Gerencie suas informações pessoais.</p>
+          <h2 className="text-3xl font-display font-black uppercase tracking-tighter" style={{ color: 'var(--text-heading)' }}>Meu Perfil</h2>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Gerencie suas informações pessoais.</p>
         </div>
-        <button onClick={onLogout} className="px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-black uppercase hover:bg-red-500 hover:text-white transition-all">Sair da Conta</button>
+        <button
+          onClick={onLogout}
+          className="px-4 py-2 border rounded-xl text-xs font-black uppercase hover:bg-red-500 hover:text-white transition-all"
+          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}
+        >
+          Sair da Conta
+        </button>
       </div>
 
+      {/* Dados pessoais */}
       <div className="glass-card p-8 space-y-8">
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <div className="relative group">
-            <div className="w-32 h-32 rounded-3xl bg-navy-800 border-2 border-navy-700 flex items-center justify-center overflow-hidden shadow-2xl group-hover:border-accent-cyan transition-all relative">
+            <div
+              className="w-32 h-32 rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl relative transition-all"
+              style={{ background: 'var(--bg-surface)', border: '2px solid var(--border-main)' }}
+            >
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-4xl font-black text-accent-cyan">{fullName?.charAt(0) || '?'}</span>
+                <span className="text-4xl font-black" style={{ color: 'var(--accent)' }}>{fullName?.charAt(0) || '?'}</span>
               )}
-              
               {isUploading && (
-                <div className="absolute inset-0 bg-navy-950/60 flex items-center justify-center">
-                  <div className="w-6 h-6 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(5,12,22,0.6)' }}>
+                  <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
                 </div>
               )}
             </div>
-            
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
-              className="absolute -bottom-2 -right-2 w-10 h-10 bg-accent-cyan text-navy-950 rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+              className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer"
+              style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
               title="Trocar Foto"
             >
               <Camera size={20} />
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-              className="hidden" 
-              accept="image/*"
-            />
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*" />
           </div>
-          
+
           <div className="flex-1 space-y-4 w-full">
             <div>
-              <label className="text-[10px] font-black text-slate-gray uppercase tracking-widest block mb-2 ml-1">Nome Completo</label>
-              <input 
+              <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>Nome Completo</label>
+              <input
                 type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                className="w-full bg-navy-950 border border-navy-800 text-white rounded-xl px-4 py-3 focus:border-accent-cyan transition-all outline-none"
+                className="w-full rounded-xl px-4 py-3 outline-none transition-all"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
               />
             </div>
-            <div className="p-4 bg-navy-900/50 rounded-2xl border border-navy-800 border-dashed">
-               <p className="text-[10px] text-slate-gray text-center font-medium">Sua foto será armazenada de forma segura e visível para todos os membros da sua igreja.</p>
+            <div className="p-4 rounded-2xl border border-dashed" style={{ background: 'var(--accent-subtle)', borderColor: 'var(--accent-border)' }}>
+              <p className="text-[10px] text-center font-medium" style={{ color: 'var(--text-secondary)' }}>Sua foto será armazenada de forma segura e visível para todos os membros da sua igreja.</p>
             </div>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-navy-800 flex justify-end">
-          <button 
-            onClick={handleSave}
-            disabled={isSaving || isUploading}
-            className="btn-primary px-8 py-3"
-          >
+        <div className="pt-6 flex justify-end" style={{ borderTop: '1px solid var(--border-main)' }}>
+          <button onClick={handleSave} disabled={isSaving || isUploading} className="btn-primary px-8 py-3 cursor-pointer">
             {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+          </button>
+        </div>
+      </div>
+
+      {/* Configurações */}
+      <div className="glass-card p-8 space-y-6">
+        <div>
+          <h3 className="text-lg font-display font-black uppercase tracking-tight" style={{ color: 'var(--text-heading)' }}>Configurações</h3>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Personalize sua experiência no app.</p>
+        </div>
+
+        {/* Toggle de tema */}
+        <div
+          className="flex items-center justify-between p-4 rounded-2xl"
+          style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+              {theme === 'dark'
+                ? <Moon size={18} style={{ color: 'var(--accent)' }} />
+                : <Sun size={18} style={{ color: 'var(--accent)' }} />
+              }
+            </div>
+            <div>
+              <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                {theme === 'dark' ? 'Tema Escuro' : 'Tema Claro'}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                {theme === 'dark' ? 'Clique para usar o tema claro' : 'Clique para usar o tema escuro'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="relative w-14 h-7 rounded-full transition-all duration-300 focus:outline-none cursor-pointer flex-shrink-0"
+            style={{ background: theme === 'dark' ? 'var(--accent)' : 'var(--border-main)' }}
+            aria-label="Alternar tema"
+          >
+            <motion.span
+              className="absolute top-0.5 left-0.5 w-6 h-6 rounded-full shadow-md flex items-center justify-center"
+              animate={{ x: theme === 'dark' ? 28 : 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              style={{ background: theme === 'dark' ? '#0A192F' : '#FFFFFF' }}
+            >
+              {theme === 'dark'
+                ? <Moon size={12} style={{ color: 'var(--accent)' }} />
+                : <Sun size={12} style={{ color: '#F59E0B' }} />
+              }
+            </motion.span>
           </button>
         </div>
       </div>
     </div>
   );
 }
+

@@ -4,55 +4,181 @@
 @theme {
   --color-navy-950: #050C16;
   --color-navy-900: #0A192F;
+  --color-navy-850: #0D1F38;
   --color-navy-800: #112240;
+  --color-navy-750: #162B4D;
   --color-navy-700: #1D2D50;
   --color-navy-600: #2D3D60;
   --color-accent-cyan: #64FFDA;
   --color-slate-gray: #8892B0;
   --color-slate-light: #CCD6F6;
-  
+
+  /* Light theme palette */
+  --color-sky-50: #F0F6FF;
+  --color-sky-100: #DBEAFE;
+  --color-sky-200: #BFDBFE;
+  --color-sky-300: #93C5FD;
+  --color-blue-500: #3B82F6;
+  --color-blue-600: #2563EB;
+  --color-blue-700: #1D4ED8;
+  --color-blue-900: #1E3A5F;
+  --color-blue-muted: #6B7FA3;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Urbanist", sans-serif;
 }
 
+/* ─── DARK THEME (existing) ─────────────────────────────── */
+html.dark {
+  --bg-base:        #0A192F;
+  --bg-surface:     #112240;
+  --bg-elevated:    rgba(17,34,64,0.4);
+  --bg-input:       #050C16;
+  --border-main:    #1D2D50;
+  --border-subtle:  #112240;
+  --text-primary:   #CCD6F6;
+  --text-secondary: #8892B0;
+  --text-heading:   #ffffff;
+  --accent:         #64FFDA;
+  --accent-subtle:  rgba(100,255,218,0.1);
+  --accent-border:  rgba(100,255,218,0.2);
+  --accent-text:    #050C16;
+  --nav-active-bg:  rgba(100,255,218,0.1);
+  --nav-active-shadow: inset 0 0 0 1px rgba(100,255,218,0.2);
+  --card-shadow:    0 4px 30px rgba(0,0,0,0.5);
+  --scrollbar:      #1D2D50;
+  --scrollbar-hover:#2D3D60;
+}
+
+/* ─── LIGHT THEME (new default) ────────────────────────── */
+html.light, html:not(.dark) {
+  --bg-base:        #F0F6FF;
+  --bg-surface:     #FFFFFF;
+  --bg-elevated:    rgba(255,255,255,0.85);
+  --bg-input:       #F8FAFF;
+  --border-main:    #DBEAFE;
+  --border-subtle:  #E8F0FE;
+  --text-primary:   #1E3A5F;
+  --text-secondary: #6B7FA3;
+  --text-heading:   #0F2850;
+  --accent:         #2563EB;
+  --accent-subtle:  rgba(37,99,235,0.08);
+  --accent-border:  rgba(37,99,235,0.25);
+  --accent-text:    #FFFFFF;
+  --nav-active-bg:  rgba(37,99,235,0.1);
+  --nav-active-shadow: inset 0 0 0 1px rgba(37,99,235,0.2);
+  --card-shadow:    0 4px 24px rgba(37,99,235,0.07);
+  --scrollbar:      #BFDBFE;
+  --scrollbar-hover:#93C5FD;
+}
+
+/* ─── BASE ──────────────────────────────────────────────── */
 @layer base {
   body {
-    @apply bg-navy-900 text-slate-light font-sans antialiased;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    @apply font-sans antialiased;
   }
-  
+
   h1, h2, h3, h4 {
+    color: var(--text-heading);
     @apply font-display;
   }
 }
 
+/* ─── UTILITY CLASSES USING CSS VARIABLES ───────────────── */
+
+/* Text */
+.text-theme-primary   { color: var(--text-primary) !important; }
+.text-theme-secondary { color: var(--text-secondary) !important; }
+.text-theme-heading   { color: var(--text-heading) !important; }
+.text-theme-accent    { color: var(--accent) !important; }
+
+/* Backgrounds */
+.bg-theme-base     { background-color: var(--bg-base) !important; }
+.bg-theme-surface  { background-color: var(--bg-surface) !important; }
+.bg-theme-elevated { background-color: var(--bg-elevated) !important; }
+.bg-theme-input    { background-color: var(--bg-input) !important; }
+.bg-theme-accent   { background-color: var(--accent) !important; }
+.bg-theme-accent-subtle { background-color: var(--accent-subtle) !important; }
+
+/* Borders */
+.border-theme      { border-color: var(--border-main) !important; }
+.border-theme-subtle { border-color: var(--border-subtle) !important; }
+.border-theme-accent { border-color: var(--accent-border) !important; }
+
+/* ─── GLASS CARD ────────────────────────────────────────── */
 .glass-card {
-  @apply bg-navy-800/40 backdrop-blur-md border border-navy-700 rounded-2xl shadow-2xl transition-all duration-300;
+  background-color: var(--bg-elevated);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-main);
+  box-shadow: var(--card-shadow);
+  @apply rounded-2xl transition-all duration-300;
 }
 
+/* ─── BUTTONS ───────────────────────────────────────────── */
 .btn-primary {
-  @apply bg-accent-cyan text-navy-950 px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95 hover:shadow-[0_0_15px_rgba(100,255,218,0.3)] hover:brightness-110;
+  background-color: var(--accent);
+  color: var(--accent-text);
+  @apply px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95 hover:brightness-110;
+  box-shadow: 0 0 0 0 var(--accent);
+}
+.btn-primary:hover {
+  box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .btn-outline {
-  @apply border border-accent-cyan text-accent-cyan px-6 py-2.5 rounded-xl font-bold transition-all hover:bg-accent-cyan/10;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  @apply px-6 py-2.5 rounded-xl font-bold transition-all;
+}
+.btn-outline:hover {
+  background-color: var(--accent-subtle);
 }
 
+/* ─── NAV LINKS ─────────────────────────────────────────── */
 .nav-link {
-  @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-slate-gray hover:text-white;
+  color: var(--text-secondary);
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all;
+}
+.nav-link:hover {
+  color: var(--text-heading);
+  background-color: var(--accent-subtle);
 }
 
 .nav-link-active {
-  @apply bg-accent-cyan/10 text-accent-cyan shadow-[inset_0_0_0_1px_rgba(100,255,218,0.2)];
+  background-color: var(--nav-active-bg);
+  color: var(--accent);
+  box-shadow: var(--nav-active-shadow);
 }
 
+/* ─── INPUTS ────────────────────────────────────────────── */
+.theme-input {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-main);
+  color: var(--text-primary);
+  @apply rounded-xl px-4 py-3 w-full outline-none transition-all;
+}
+.theme-input:focus {
+  border-color: var(--accent);
+}
+.theme-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ─── SCROLLBAR ─────────────────────────────────────────── */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-navy-700 rounded-full hover:bg-navy-600;
+  background-color: var(--scrollbar);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-hover);
 }
