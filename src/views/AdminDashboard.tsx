@@ -2039,6 +2039,13 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [deletingEvent, setDeletingEvent] = useState<any | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
+  // Dedicated Setlist Modal States
+  const [isSetlistModalOpen, setIsSetlistModalOpen] = useState(false);
+  const [setlistModalEvent, setSetlistModalEvent] = useState<any>(null);
+  const [setlistModalIsEditable, setSetlistModalIsEditable] = useState(false);
+  const [setlistModalSongs, setSetlistModalSongs] = useState<any[]>([]);
+  const [isSavingSetlistModal, setIsSavingSetlistModal] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -2387,6 +2394,142 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
     setSelectedSongsForSchedule(updated);
   };
 
+  const getEventSetlist = (eventId: string) => {
+    const masterSchedule = schedules.find(s => {
+      if (s.event_id !== eventId) return false;
+      const min = ministries.find(m => m.id === s.ministry_id);
+      const mName = min?.name?.toLowerCase() || '';
+      return mName.includes('louvor') || mName.includes('música') || mName.includes('musica');
+    }) || schedules.find(s => s.event_id === eventId);
+
+    if (!masterSchedule) return [];
+
+    return scheduleSongs
+      .filter(ss => ss.schedule_id === masterSchedule.id)
+      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  };
+
+  const openSetlistModal = async (event: any, canEdit: boolean) => {
+    setSetlistModalEvent(event);
+    setSetlistModalIsEditable(canEdit);
+
+    let masterSchedule = schedules.find(s => {
+      if (s.event_id !== event.id) return false;
+      const min = ministries.find(m => m.id === s.ministry_id);
+      const mName = min?.name?.toLowerCase() || '';
+      return mName.includes('louvor') || mName.includes('música') || mName.includes('musica');
+    }) || schedules.find(s => s.event_id === event.id);
+
+    if (masterSchedule) {
+      const { data: songs } = await supabase
+        .from('schedule_songs')
+        .select('*, songs(*)')
+        .eq('schedule_id', masterSchedule.id)
+        .order('order_index');
+
+      if (songs) {
+        setSetlistModalSongs(songs.map(ss => ({
+          ...ss.songs,
+          custom_key: ss.custom_key || ss.songs?.key || '',
+          order_index: ss.order_index
+        })));
+      } else {
+        setSetlistModalSongs([]);
+      }
+    } else {
+      setSetlistModalSongs([]);
+    }
+
+    setIsSetlistModalOpen(true);
+  };
+
+  const addSongToDedicatedSetlist = (songId: string) => {
+    const song = allSongs.find(s => s.id === songId);
+    if (song && !setlistModalSongs.find(s => s.id === songId)) {
+      setSetlistModalSongs([
+        ...setlistModalSongs,
+        { ...song, custom_key: song.key || '' }
+      ]);
+    }
+  };
+
+  const moveDedicatedSongUp = (index: number) => {
+    if (index === 0) return;
+    const updated = [...setlistModalSongs];
+    const temp = updated[index - 1];
+    updated[index - 1] = updated[index];
+    updated[index] = temp;
+    setSetlistModalSongs(updated);
+  };
+
+  const moveDedicatedSongDown = (index: number) => {
+    if (index === setlistModalSongs.length - 1) return;
+    const updated = [...setlistModalSongs];
+    const temp = updated[index + 1];
+    updated[index + 1] = updated[index];
+    updated[index] = temp;
+    setSetlistModalSongs(updated);
+  };
+
+  const updateDedicatedSongKey = (index: number, newKey: string) => {
+    const updated = [...setlistModalSongs];
+    updated[index] = { ...updated[index], custom_key: newKey };
+    setSetlistModalSongs(updated);
+  };
+
+  const handleSaveDedicatedSetlist = async () => {
+    if (!setlistModalEvent) return;
+    setIsSavingSetlistModal(true);
+    try {
+      let targetMinistry = louvorMin || ministries[0];
+      let masterSchedule = schedules.find(s => s.event_id === setlistModalEvent.id && s.ministry_id === targetMinistry?.id);
+
+      let scheduleId;
+      if (masterSchedule) {
+        scheduleId = masterSchedule.id;
+      } else {
+        const { data: newSch, error } = await supabase.from('schedules').insert({
+          event_id: setlistModalEvent.id,
+          ministry_id: targetMinistry.id
+        }).select().single();
+        if (error) throw error;
+        scheduleId = newSch.id;
+      }
+
+      const { data: eventSchedules } = await supabase.from('schedules').select('id').eq('event_id', setlistModalEvent.id);
+      const allScheduleIds = eventSchedules?.map(s => s.id) || [scheduleId];
+
+      await supabase.from('schedule_songs').delete().in('schedule_id', allScheduleIds);
+
+      if (setlistModalSongs.length > 0) {
+        const inserts = setlistModalSongs.map((song, index) => ({
+          schedule_id: scheduleId,
+          song_id: song.id,
+          order_index: index + 1,
+          custom_key: song.custom_key || song.key || null
+        }));
+
+        const { error: insertErr } = await supabase.from('schedule_songs').insert(inserts);
+        if (insertErr) {
+          const fallback = setlistModalSongs.map((song, index) => ({
+            schedule_id: scheduleId,
+            song_id: song.id,
+            order_index: index + 1
+          }));
+          await supabase.from('schedule_songs').insert(fallback);
+        }
+      }
+
+      setIsSetlistModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error('Erro ao salvar setlist:', err);
+      alert('Erro ao salvar setlist.');
+    } finally {
+      setIsSavingSetlistModal(false);
+    }
+  };
+
   return (
     <div className="space-y-8 relative">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -2452,9 +2595,9 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 self-stretch md:self-auto justify-end">
-                  {canSeeSongs && louvorMin && (
+                  {canSeeSongs && (
                     <button
-                      onClick={() => openScheduleModal(event, louvorMin)}
+                      onClick={() => openSetlistModal(event, currentUserRole === 'manager' || (louvorMin && leadMinistriesIds.includes(louvorMin.id)))}
                       className="flex items-center gap-2 px-4 py-2.5 bg-accent-cyan/10 hover:bg-accent-cyan/20 border border-accent-cyan/30 text-accent-cyan rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
                     >
                       <Music size={14} /> Setlist do Dia
@@ -2474,6 +2617,64 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
               
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Card exclusivo para o Setlist do Dia */}
+                  {canSeeSongs && (
+                    <div className="bg-navy-950/40 border border-navy-800 rounded-2xl p-4 transition-all flex flex-col justify-between glass-card-subtle" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
+                      <div>
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#2563EB' }} />
+                            <span className="text-sm font-black uppercase tracking-tighter" style={{ color: 'var(--text-heading)' }}>
+                              Setlist do Dia
+                            </span>
+                          </div>
+                          {currentUserRole === 'manager' || (louvorMin && leadMinistriesIds.includes(louvorMin.id)) ? (
+                            <button 
+                              onClick={() => openSetlistModal(event, true)}
+                              className="text-[10px] font-black uppercase transition-colors cursor-pointer"
+                              style={{ color: 'var(--accent)' }}
+                            >
+                              {getEventSetlist(event.id).length > 0 ? 'Editar' : 'Montar'}
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => openSetlistModal(event, false)}
+                              className="text-[10px] font-bold uppercase transition-colors cursor-pointer"
+                              style={{ color: 'var(--text-secondary)' }}
+                            >
+                              Ver Setlist
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 min-h-[40px]">
+                          {getEventSetlist(event.id).length > 0 ? (
+                            getEventSetlist(event.id).slice(0, 4).map((ss: any, idx: number) => (
+                              <div key={ss.id || idx} className="flex justify-between items-center text-xs gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="w-4 h-4 rounded text-[9px] font-black flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
+                                    {idx + 1}
+                                  </span>
+                                  <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ss.songs?.title}</span>
+                                </div>
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
+                                  {ss.custom_key || ss.songs?.key || '-'}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-[11px] italic" style={{ color: 'var(--text-secondary)' }}>Nenhuma música no setlist</p>
+                          )}
+                          {getEventSetlist(event.id).length > 4 && (
+                            <p className="text-[10px] font-bold text-center pt-1" style={{ color: 'var(--accent)' }}>
+                              +{getEventSetlist(event.id).length - 4} mais músicas...
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {ministries.map(min => {
                     const isMusicOrMedia = ['louvor', 'musica', 'música', 'worship', 'som', 'mídia', 'midia', 'comunicação', 'comunicacao'].some(k => min.name.toLowerCase().includes(k));
                     if (isMusicOrMedia && !canSeeSongs) return null;
@@ -3068,6 +3269,220 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Exclusivo de Setlist do Dia (Visualização Mídia / Edição Louvor) */}
+      <AnimatePresence>
+        {isSetlistModalOpen && setlistModalEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsSetlistModalOpen(false)}
+              className="absolute inset-0 bg-navy-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card p-6 md:p-8 w-full max-w-lg relative z-10 overflow-hidden flex flex-col max-h-[85vh]"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)' }}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2">
+                  <Music size={20} style={{ color: 'var(--accent)' }} />
+                  <div>
+                    <h3 className="text-xl font-display font-black uppercase tracking-tight" style={{ color: 'var(--text-heading)' }}>
+                      Setlist do Culto
+                    </h3>
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                      {setlistModalEvent.title} • {new Date(setlistModalEvent.date).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setIsSetlistModalOpen(false)} style={{ color: 'var(--text-secondary)' }} className="p-1 cursor-pointer">
+                  <XCircle size={22} />
+                </button>
+              </div>
+
+              {setlistModalIsEditable ? (
+                /* Modo Edição (Líderes de Louvor e Administradores) */
+                <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                      Adicionar Música ao Repertório
+                    </label>
+                    <select 
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          addSongToDedicatedSetlist(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="w-full text-sm rounded-xl px-4 py-3 outline-none transition-all"
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">Selecione para adicionar...</option>
+                      {allSongs
+                        .filter(s => !setlistModalSongs.find(ss => ss.id === s.id))
+                        .map(s => (
+                          <option key={s.id} value={s.id}>{s.title} - {s.artist}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                      Ordem & Tom das Músicas
+                    </label>
+                    {setlistModalSongs.map((song, idx) => (
+                      <div key={song.id} className="flex items-center justify-between p-3 rounded-xl border gap-2" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex flex-col gap-0.5 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => moveDedicatedSongUp(idx)}
+                              disabled={idx === 0}
+                              className="p-0.5 rounded text-[10px] font-black disabled:opacity-20 cursor-pointer"
+                              style={{ color: 'var(--accent)' }}
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveDedicatedSongDown(idx)}
+                              disabled={idx === setlistModalSongs.length - 1}
+                              className="p-0.5 rounded text-[10px] font-black disabled:opacity-20 cursor-pointer"
+                              style={{ color: 'var(--accent)' }}
+                            >
+                              ▼
+                            </button>
+                          </div>
+
+                          <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-black flex-shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
+                            {idx + 1}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold truncate" style={{ color: 'var(--text-heading)' }}>{song.title}</p>
+                            <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{song.artist}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}>
+                            <span className="text-[9px] font-black uppercase" style={{ color: 'var(--text-secondary)' }}>Tom:</span>
+                            <input
+                              type="text"
+                              value={song.custom_key ?? song.key ?? ''}
+                              onChange={(e) => updateDedicatedSongKey(idx, e.target.value)}
+                              placeholder="G#"
+                              className="w-12 text-xs font-bold text-center outline-none bg-transparent"
+                              style={{ color: 'var(--accent)' }}
+                            />
+                          </div>
+
+                          <button 
+                            type="button"
+                            onClick={() => setSetlistModalSongs(setlistModalSongs.filter(s => s.id !== song.id))}
+                            className="p-1 cursor-pointer hover:text-red-500 transition-colors"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {setlistModalSongs.length === 0 && (
+                      <div className="py-10 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2" style={{ borderColor: 'var(--border-main)', color: 'var(--text-secondary)' }}>
+                        <Music size={24} className="opacity-40" />
+                        <span className="text-[10px] font-bold uppercase">Nenhuma música no setlist</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Modo Visualização READ-ONLY (Mídia & Comunicação e Visitantes) */
+                <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                  <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/10 mb-2">
+                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 text-center uppercase tracking-widest">
+                      Modo Visualização (Mídia & Transmissão)
+                    </p>
+                  </div>
+
+                  {setlistModalSongs.map((song, idx) => (
+                    <div key={song.id} className="p-4 rounded-2xl space-y-3 border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex gap-3">
+                          <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold leading-none mb-1" style={{ color: 'var(--text-heading)' }}>{song.title}</h4>
+                            <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{song.artist}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {(song.custom_key || song.key) && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                              Tom: {song.custom_key || song.key}
+                            </span>
+                          )}
+                          {song.bpm && <span className="text-[9px] font-bold" style={{ color: 'var(--text-secondary)' }}>{song.bpm} BPM</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        {song.video_url && (
+                          <a 
+                            href={song.video_url} target="_blank" rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border"
+                            style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}
+                          >
+                            <Youtube size={12} /> Video
+                          </a>
+                        )}
+                        {song.lyrics_url && (
+                          <a 
+                            href={song.lyrics_url} target="_blank" rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border"
+                            style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}
+                          >
+                            <Music size={12} /> Cifra
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {setlistModalSongs.length === 0 && (
+                    <div className="py-12 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2" style={{ borderColor: 'var(--border-main)', color: 'var(--text-secondary)' }}>
+                      <Music size={24} className="opacity-40" />
+                      <span className="text-[10px] font-bold uppercase">Nenhuma música escalada para este culto</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {setlistModalIsEditable ? (
+                <div className="flex gap-3 pt-6 mt-4 border-t" style={{ borderColor: 'var(--border-main)' }}>
+                  <button type="button" onClick={() => setIsSetlistModalOpen(false)} className="flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-colors cursor-pointer" style={{ color: 'var(--text-secondary)' }}>Cancelar</button>
+                  <button 
+                    onClick={handleSaveDedicatedSetlist}
+                    disabled={isSavingSetlistModal} 
+                    className="flex-1 btn-primary text-sm cursor-pointer"
+                  >
+                    {isSavingSetlistModal ? 'Salvando...' : 'Salvar Setlist'}
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-4 mt-2 border-t" style={{ borderColor: 'var(--border-main)' }}>
+                  <button type="button" onClick={() => setIsSetlistModalOpen(false)} className="w-full py-3 px-4 rounded-xl text-sm font-bold transition-colors cursor-pointer border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}>
+                    Fechar
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
