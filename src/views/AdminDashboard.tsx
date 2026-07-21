@@ -2252,7 +2252,11 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
         .eq('schedule_id', schedule.id)
         .order('order_index');
       if (songs) {
-        setSelectedSongsForSchedule(songs.map(ss => ss.songs));
+        setSelectedSongsForSchedule(songs.map(ss => ({
+          ...ss.songs,
+          custom_key: ss.custom_key || ss.songs?.key || '',
+          order_index: ss.order_index
+        })));
       } else {
         setSelectedSongsForSchedule([]);
       }
@@ -2314,13 +2318,23 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
         // Deletar antigos
         await supabase.from('schedule_songs').delete().eq('schedule_id', scheduleId);
         
-        // Inserir novos
+        // Inserir novos com ordem e tom
         const songsToInsert = selectedSongsForSchedule.map((song, index) => ({
           schedule_id: scheduleId,
           song_id: song.id,
-          order_index: index + 1
+          order_index: index + 1,
+          custom_key: song.custom_key || song.key || null
         }));
-        await supabase.from('schedule_songs').insert(songsToInsert);
+        
+        const { error: insertErr } = await supabase.from('schedule_songs').insert(songsToInsert);
+        if (insertErr) {
+          const fallback = selectedSongsForSchedule.map((song, index) => ({
+            schedule_id: scheduleId,
+            song_id: song.id,
+            order_index: index + 1
+          }));
+          await supabase.from('schedule_songs').insert(fallback);
+        }
       } else {
         // Se não houver músicas, garantir que limpamos o setlist antigo
         await supabase.from('schedule_songs').delete().eq('schedule_id', scheduleId);
@@ -2338,12 +2352,39 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const addSongToSetlist = (songId: string) => {
     const song = allSongs.find(s => s.id === songId);
     if (song && !selectedSongsForSchedule.find(s => s.id === songId)) {
-      setSelectedSongsForSchedule([...selectedSongsForSchedule, song]);
+      setSelectedSongsForSchedule([
+        ...selectedSongsForSchedule, 
+        { ...song, custom_key: song.key || '' }
+      ]);
     }
   };
 
   const removeSongFromSetlist = (songId: string) => {
     setSelectedSongsForSchedule(selectedSongsForSchedule.filter(s => s.id !== songId));
+  };
+
+  const moveSongUpInSetlist = (index: number) => {
+    if (index === 0) return;
+    const updated = [...selectedSongsForSchedule];
+    const temp = updated[index - 1];
+    updated[index - 1] = updated[index];
+    updated[index] = temp;
+    setSelectedSongsForSchedule(updated);
+  };
+
+  const moveSongDownInSetlist = (index: number) => {
+    if (index === selectedSongsForSchedule.length - 1) return;
+    const updated = [...selectedSongsForSchedule];
+    const temp = updated[index + 1];
+    updated[index + 1] = updated[index];
+    updated[index] = temp;
+    setSelectedSongsForSchedule(updated);
+  };
+
+  const updateSetlistSongKey = (index: number, newKey: string) => {
+    const updated = [...selectedSongsForSchedule];
+    updated[index] = { ...updated[index], custom_key: newKey };
+    setSelectedSongsForSchedule(updated);
   };
 
   return (
@@ -2942,22 +2983,71 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                     ) : (
                       <div className="space-y-2">
                         {selectedSongsForSchedule.map((song, index) => (
-                          <div key={song.id} className="flex items-center justify-between p-3 bg-navy-800/50 rounded-xl border border-navy-700 group">
-                            <div className="flex items-center gap-3">
-                              <div className="w-6 h-6 rounded-md bg-navy-700 flex items-center justify-center text-[10px] font-bold text-accent-cyan">
+                          <div 
+                            key={song.id} 
+                            className="flex items-center justify-between p-3 rounded-xl border gap-2 transition-all"
+                            style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {/* Botões de Ordem (Reordenar) */}
+                              <div className="flex flex-col gap-0.5 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => moveSongUpInSetlist(index)}
+                                  disabled={index === 0}
+                                  className="p-0.5 rounded text-[10px] font-black disabled:opacity-20 cursor-pointer hover:bg-black/10 dark:hover:bg-white/10"
+                                  style={{ color: 'var(--accent)' }}
+                                  title="Mover para cima"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveSongDownInSetlist(index)}
+                                  disabled={index === selectedSongsForSchedule.length - 1}
+                                  className="p-0.5 rounded text-[10px] font-black disabled:opacity-20 cursor-pointer hover:bg-black/10 dark:hover:bg-white/10"
+                                  style={{ color: 'var(--accent)' }}
+                                  title="Mover para baixo"
+                                >
+                                  ▼
+                                </button>
+                              </div>
+
+                              {/* Badge da Ordem */}
+                              <div className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black flex-shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', border: '1px solid var(--accent-border)' }}>
                                 {index + 1}
                               </div>
-                              <div>
-                                <p className="text-xs font-bold text-white">{song.title}</p>
-                                <p className="text-[10px] text-slate-gray">{song.artist} • {song.key}</p>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold truncate" style={{ color: 'var(--text-heading)' }}>{song.title}</p>
+                                <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{song.artist}</p>
                               </div>
                             </div>
-                            <button 
-                              onClick={() => removeSongFromSetlist(song.id)}
-                              className="p-1.5 text-slate-gray hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+
+                            {/* Tom (Key Input) & Excluir */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="flex items-center gap-1 bg-navy-950/20 px-2 py-1 rounded-lg border border-navy-800" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}>
+                                <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Tom:</span>
+                                <input
+                                  type="text"
+                                  value={song.custom_key ?? song.key ?? ''}
+                                  onChange={(e) => updateSetlistSongKey(index, e.target.value)}
+                                  placeholder="G#"
+                                  className="w-12 text-xs font-bold text-center outline-none bg-transparent"
+                                  style={{ color: 'var(--accent)' }}
+                                />
+                              </div>
+
+                              <button 
+                                type="button"
+                                onClick={() => removeSongFromSetlist(song.id)}
+                                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:text-red-500"
+                                style={{ color: 'var(--text-secondary)' }}
+                                title="Remover do Setlist"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

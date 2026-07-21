@@ -343,6 +343,30 @@ export function VolunteerApp() {
     }
   };
 
+  const moveSongUpInVolunteerSetlist = (index: number) => {
+    if (index === 0) return;
+    const updated = [...selectedSongsForSetlist];
+    const temp = updated[index - 1];
+    updated[index - 1] = updated[index];
+    updated[index] = temp;
+    setSelectedSongsForSetlist(updated);
+  };
+
+  const moveSongDownInVolunteerSetlist = (index: number) => {
+    if (index === selectedSongsForSetlist.length - 1) return;
+    const updated = [...selectedSongsForSetlist];
+    const temp = updated[index + 1];
+    updated[index + 1] = updated[index];
+    updated[index] = temp;
+    setSelectedSongsForSetlist(updated);
+  };
+
+  const updateVolunteerSetlistSongKey = (index: number, newKey: string) => {
+    const updated = [...selectedSongsForSetlist];
+    updated[index] = { ...updated[index], custom_key: newKey };
+    setSelectedSongsForSetlist(updated);
+  };
+
   const handleSaveSetlist = async () => {
     if (!selectedScheduleForEdit) return;
     setIsSubmittingSetlist(true);
@@ -365,11 +389,20 @@ export function VolunteerApp() {
       const inserts = selectedSongsForSetlist.map((song, index) => ({
         schedule_id: targetScheduleId,
         song_id: song.id,
-        order_index: index + 1
+        order_index: index + 1,
+        custom_key: song.custom_key || song.key || null
       }));
       
       if (inserts.length > 0) {
-        await supabase.from('schedule_songs').insert(inserts);
+        const { error: insertErr } = await supabase.from('schedule_songs').insert(inserts);
+        if (insertErr) {
+          const fallback = selectedSongsForSetlist.map((song, index) => ({
+            schedule_id: targetScheduleId,
+            song_id: song.id,
+            order_index: index + 1
+          }));
+          await supabase.from('schedule_songs').insert(fallback);
+        }
       }
       
       setIsEditSetlistModalOpen(false);
@@ -990,7 +1023,7 @@ export function VolunteerApp() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          {ss.songs.key && <span className="text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>{ss.songs.key}</span>}
+                          {(ss.custom_key || ss.songs.key) && <span className="text-[10px] font-black px-1.5 py-0.5 rounded border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>Tom: {ss.custom_key || ss.songs.key}</span>}
                           {ss.songs.bpm && <span className="text-[9px] font-bold" style={{ color: 'var(--text-secondary)' }}>{ss.songs.bpm} BPM</span>}
                         </div>
                       </div>
@@ -1052,7 +1085,7 @@ export function VolunteerApp() {
                       onChange={(e) => {
                         const song = songs.find(s => s.id === e.target.value);
                         if (song && !selectedSongsForSetlist.find(s => s.id === song.id)) {
-                          setSelectedSongsForSetlist([...selectedSongsForSetlist, song]);
+                          setSelectedSongsForSetlist([...selectedSongsForSetlist, { ...song, custom_key: song.key || '' }]);
                         }
                         e.target.value = "";
                       }}
@@ -1067,23 +1100,67 @@ export function VolunteerApp() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>Ordem das Músicas</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>Ordem & Tom das Músicas</label>
                     {selectedSongsForSetlist.map((song, idx) => (
-                      <div key={song.id} className="flex items-center gap-3 p-3 rounded-xl border group" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
-                        <div className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-black" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
-                          {idx + 1}
+                      <div key={song.id} className="flex items-center justify-between p-3 rounded-xl border gap-2" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {/* Reorder Buttons */}
+                          <div className="flex flex-col gap-0.5 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => moveSongUpInVolunteerSetlist(idx)}
+                              disabled={idx === 0}
+                              className="p-0.5 rounded text-[10px] font-black disabled:opacity-20 cursor-pointer hover:bg-black/10 dark:hover:bg-white/10"
+                              style={{ color: 'var(--accent)' }}
+                              title="Mover para cima"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveSongDownInVolunteerSetlist(idx)}
+                              disabled={idx === selectedSongsForSetlist.length - 1}
+                              className="p-0.5 rounded text-[10px] font-black disabled:opacity-20 cursor-pointer hover:bg-black/10 dark:hover:bg-white/10"
+                              style={{ color: 'var(--accent)' }}
+                              title="Mover para baixo"
+                            >
+                              ▼
+                            </button>
+                          </div>
+
+                          <div className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-black flex-shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
+                            {idx + 1}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold truncate" style={{ color: 'var(--text-heading)' }}>{song.title}</p>
+                            <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{song.artist}</p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold truncate" style={{ color: 'var(--text-heading)' }}>{song.title}</p>
-                          <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{song.artist}</p>
+
+                        {/* Tom (Key Input) & Delete */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}>
+                            <span className="text-[9px] font-black uppercase" style={{ color: 'var(--text-secondary)' }}>Tom:</span>
+                            <input
+                              type="text"
+                              value={song.custom_key ?? song.key ?? ''}
+                              onChange={(e) => updateVolunteerSetlistSongKey(idx, e.target.value)}
+                              placeholder="Tom"
+                              className="w-10 text-xs font-bold text-center outline-none bg-transparent"
+                              style={{ color: 'var(--accent)' }}
+                            />
+                          </div>
+
+                          <button 
+                            type="button"
+                            onClick={() => setSelectedSongsForSetlist(selectedSongsForSetlist.filter(s => s.id !== song.id))}
+                            className="p-1 cursor-pointer hover:text-red-500 transition-colors"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => setSelectedSongsForSetlist(selectedSongsForSetlist.filter(s => s.id !== song.id))}
-                          className="p-1 cursor-pointer hover:text-red-500"
-                          style={{ color: 'var(--text-secondary)' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     ))}
                     {selectedSongsForSetlist.length === 0 && (
