@@ -73,6 +73,7 @@ const GROWTH_DATA = [
 ];
 
 export function AdminDashboard() {
+  const { theme } = useTheme();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [volunteers] = useState<Volunteer[]>(MOCK_VOLUNTEERS);
   const [events] = useState<Event[]>(MOCK_EVENTS);
@@ -139,10 +140,14 @@ export function AdminDashboard() {
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 w-72 flex flex-col z-50 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ background: 'var(--bg-base)', borderRight: '1px solid var(--border-main)' }}>
         <div className="p-8">
-          <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-3">
-              <div className="w-36 h-12 flex items-center justify-start overflow-hidden relative">
-                <img src="/church_full.png" alt="Church+" className="w-full h-full object-contain scale-175 -ml-4" />
+              <div className="h-8 flex items-center justify-start overflow-hidden">
+                <img 
+                  src={theme === 'dark' ? '/church_logo_dark.svg' : '/church_logo_light.svg'} 
+                  alt="Church+" 
+                  className="h-8 w-auto object-contain transition-all"
+                />
               </div>
             </div>
             <button className="lg:hidden" style={{ color: 'var(--text-secondary)' }} onClick={() => setSidebarOpen(false)}>
