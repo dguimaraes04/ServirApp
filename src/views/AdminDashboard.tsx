@@ -1512,6 +1512,68 @@ function MinistriesView() {
   );
 }
 
+const parseWorshipRole = (roleFunc: string) => {
+  const normalized = (roleFunc || '').toLowerCase().trim();
+  
+  if (!normalized) return { baseRole: '', modifier: '' };
+
+  // Find base role
+  let baseRole = '';
+  if (normalized.includes('ministro')) baseRole = 'Ministro de Louvor';
+  else if (normalized.includes('vocal')) baseRole = 'Vocalista';
+  else if (normalized.includes('violão') || normalized.includes('violao')) baseRole = 'Violonista';
+  else if (normalized.includes('guitarra')) baseRole = 'Guitarrista';
+  else if (normalized.includes('teclado') || normalized.includes('tecladista')) baseRole = 'Tecladista';
+  else if (normalized.includes('baixo') || normalized.includes('baixista')) baseRole = 'Baixista';
+  else if (normalized.includes('bateria') || normalized.includes('baterista')) baseRole = 'Baterista';
+  
+  // Find modifier
+  let modifier = '';
+  if (normalized.includes('principal') || normalized.includes(' 1') || normalized.endsWith(' 1')) modifier = 'Principal';
+  else if (normalized.includes('secundario') || normalized.includes('secundário') || normalized.includes(' 2') || normalized.endsWith(' 2')) modifier = 'Secundário';
+  else if (normalized.includes('backing') || normalized.includes('back')) modifier = 'Backing';
+
+  // If we found a base role, return it. Otherwise, it is 'Custom'
+  if (baseRole) {
+    return { baseRole, modifier };
+  }
+  return { baseRole: 'Custom', modifier: '' };
+};
+
+const formatWorshipRole = (base: string, mod: string) => {
+  if (base === 'Ministro de Louvor') {
+    return 'Ministro de Louvor';
+  }
+  if (base === 'Vocalista') {
+    if (mod === 'Principal') return 'Vocal Principal';
+    if (mod === 'Secundário') return 'Vocal Secundário';
+    if (mod === 'Backing') return 'Backing Vocal';
+    return 'Vocalista';
+  }
+  if (base === 'Tecladista') {
+    if (mod === 'Principal') return 'Teclado 1';
+    if (mod === 'Secundário') return 'Teclado 2';
+    return 'Tecladista';
+  }
+  if (base === 'Guitarrista') {
+    if (mod === 'Principal') return 'Guitarra 1';
+    if (mod === 'Secundário') return 'Guitarra 2';
+    return 'Guitarrista';
+  }
+  if (base === 'Violonista') {
+    if (mod === 'Principal') return 'Violão 1';
+    if (mod === 'Secundário') return 'Violão 2';
+    return 'Violonista';
+  }
+  if (base === 'Baixista') {
+    return 'Baixista';
+  }
+  if (base === 'Baterista') {
+    return 'Baterista';
+  }
+  return '';
+};
+
 function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [events, setEvents] = useState<any[]>([]);
   const [ministries, setMinistries] = useState<any[]>([]);
@@ -1980,14 +2042,106 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                         </div>
                         
                         {isSelected && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}>
-                            <input 
-                              type="text" 
-                              value={selectedVol?.role_function || ''} 
-                              onChange={(e) => updateRoleFunction(v.id, e.target.value)}
-                              placeholder="Função (ex: Teclado, Câmera 1...)"
-                              className="w-full px-3 py-2 bg-navy-950/50 border border-navy-700 rounded-lg text-xs text-white focus:outline-none focus:border-accent-cyan transition-all"
-                            />
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mt-3 space-y-3">
+                            {(() => {
+                              const isWorship = selectedMinistry && (
+                                selectedMinistry.name.toLowerCase().includes('louvor') || 
+                                selectedMinistry.name.toLowerCase().includes('musica') || 
+                                selectedMinistry.name.toLowerCase().includes('música') || 
+                                selectedMinistry.name.toLowerCase().includes('worship')
+                              );
+
+                              if (isWorship) {
+                                const parsed = parseWorshipRole(selectedVol?.role_function || '');
+                                return (
+                                  <div className="space-y-3 bg-navy-950/20 p-3 rounded-xl border border-navy-800/80">
+                                    <div>
+                                      <p className="text-[9px] uppercase font-black text-slate-gray tracking-wider mb-2">Função no Louvor</p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {['Ministro de Louvor', 'Vocalista', 'Tecladista', 'Guitarrista', 'Violonista', 'Baixista', 'Baterista', 'Outro'].map(role => {
+                                          const active = (role === 'Outro' && parsed.baseRole === 'Custom') || (parsed.baseRole === role);
+                                          return (
+                                            <button
+                                              key={role}
+                                              type="button"
+                                              onClick={() => {
+                                                if (role === 'Outro') {
+                                                  updateRoleFunction(v.id, '');
+                                                } else {
+                                                  updateRoleFunction(v.id, formatWorshipRole(role, parsed.modifier));
+                                                }
+                                              }}
+                                              className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                                                active
+                                                  ? 'bg-accent-cyan/15 border-accent-cyan text-accent-cyan shadow-[0_0_8px_rgba(100,255,218,0.1)]'
+                                                  : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:border-navy-700'
+                                              }`}
+                                            >
+                                              {role}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    {['Vocalista', 'Tecladista', 'Guitarrista', 'Violonista'].includes(parsed.baseRole) && (
+                                      <div>
+                                        <p className="text-[9px] uppercase font-black text-slate-gray tracking-wider mb-2">Hierarquia / Variação</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {[
+                                            { label: 'Nenhuma', value: '' },
+                                            { label: parsed.baseRole === 'Vocalista' ? 'Principal' : '1 (Principal)', value: 'Principal' },
+                                            { label: parsed.baseRole === 'Vocalista' ? 'Secundário' : '2 (Apoio)', value: 'Secundário' },
+                                            ...(parsed.baseRole === 'Vocalista' ? [{ label: 'Backing Vocal', value: 'Backing' }] : [])
+                                          ].map(mod => {
+                                            const active = parsed.modifier === mod.value;
+                                            return (
+                                              <button
+                                                key={mod.label}
+                                                type="button"
+                                                onClick={() => {
+                                                  updateRoleFunction(v.id, formatWorshipRole(parsed.baseRole, mod.value));
+                                                }}
+                                                className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                                                  active
+                                                    ? 'bg-accent-cyan/15 border-accent-cyan text-accent-cyan shadow-[0_0_8px_rgba(100,255,218,0.1)]'
+                                                    : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:border-navy-700'
+                                                }`}
+                                              >
+                                                {mod.label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div>
+                                      <p className="text-[9px] uppercase font-black text-slate-gray tracking-wider mb-2">
+                                        {parsed.baseRole === 'Custom' ? 'Nome da Função (Outro)' : 'Visualização da Função'}
+                                      </p>
+                                      <input 
+                                        type="text" 
+                                        value={selectedVol?.role_function || ''} 
+                                        onChange={(e) => updateRoleFunction(v.id, e.target.value)}
+                                        placeholder={parsed.baseRole === 'Custom' ? "Ex: Saxofonista, Flautista..." : "Função..."}
+                                        className="w-full px-3 py-2 bg-navy-950/50 border border-navy-750 rounded-lg text-xs text-white focus:outline-none focus:border-accent-cyan transition-all"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <input 
+                                  type="text" 
+                                  value={selectedVol?.role_function || ''} 
+                                  onChange={(e) => updateRoleFunction(v.id, e.target.value)}
+                                  placeholder="Função (ex: Teclado, Câmera 1...)"
+                                  className="w-full px-3 py-2 bg-navy-950/50 border border-navy-700 rounded-lg text-xs text-white focus:outline-none focus:border-accent-cyan transition-all"
+                                />
+                              );
+                            })()}
                           </motion.div>
                         )}
                       </div>
