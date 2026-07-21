@@ -155,7 +155,7 @@ export function AdminDashboard() {
             />
             <NavItem 
               icon={<Calendar size={20} />} 
-              label="Escalas" 
+              label="Cultos/Eventos" 
               active={currentView === 'schedule'} 
               onClick={() => { setCurrentView('schedule'); setSidebarOpen(false); }} 
             />
@@ -1611,8 +1611,6 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   }, [ministries]);
 
   // Recurrence states
-  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
-  const [recurringEvents, setRecurringEvents] = useState<any[]>([]);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   // Recurrence form states
@@ -1649,8 +1647,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           { data: vols },
           { data: volMins },
           { data: songs },
-          { data: schSongs },
-          { data: recurrings }
+          { data: schSongs }
         ] = await Promise.all([
           supabase.from('events').select('*').eq('church_id', profile.church_id).order('date', { ascending: true }),
           supabase.from('ministries').select('*').eq('church_id', profile.church_id).order('name'),
@@ -1659,8 +1656,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           supabase.from('profiles').select('*').eq('church_id', profile.church_id).order('full_name'),
           supabase.from('volunteer_ministries').select('*'),
           supabase.from('songs').select('*').eq('church_id', profile.church_id).order('title'),
-          supabase.from('schedule_songs').select('*, songs(*)'),
-          supabase.from('recurring_events').select('*').eq('church_id', profile.church_id).order('created_at', { ascending: false })
+          supabase.from('schedule_songs').select('*, songs(*)')
         ]);
 
         if (evs) setEvents(evs);
@@ -1672,7 +1668,6 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
         if (songs) setAllSongs(songs);
         if (schSongs) setScheduleSongs(schSongs);
         else setScheduleSongs([]);
-        if (recurrings) setRecurringEvents(recurrings);
 
         if (profile.role === 'leader') {
           const { data: myMins } = await supabase
@@ -1792,31 +1787,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
     }
   };
 
-  const handleDeleteTemplate = async (templateId: string) => {
-    if (!window.confirm('Excluir este evento recorrente? Todos os eventos futuros baseados nele serão excluídos.')) return;
-    const { error } = await supabase.from('recurring_events').delete().eq('id', templateId);
-    if (!error) {
-      await syncRecurringEvents(churchId);
-      fetchData();
-    } else {
-      alert('Erro ao excluir recorrência.');
-    }
-  };
 
-  const handleEditTemplate = (template: any) => {
-    setEditingTemplateId(template.id);
-    setEventTitle(template.title);
-    setEventDescription(template.description || '');
-    setEventRecurrenceType('recurring');
-    setRecurrencePattern(template.pattern_type);
-    setRecurrenceDayOfWeek(template.day_of_week);
-    setRecurrenceWeekOfMonth(template.week_of_month || 1);
-    setRecurrenceTime(template.time.slice(0, 5)); // HH:MM
-    
-    // Open Event Creation Modal but modified for edit mode
-    setIsRecurringModalOpen(false);
-    setIsEventModalOpen(true);
-  };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1992,36 +1963,22 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
     <div className="space-y-8 relative">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-display font-black text-white uppercase tracking-tighter">Escalas Oficiais</h2>
+          <h2 className="text-2xl sm:text-3xl font-display font-black text-white uppercase tracking-tighter">Cultos/Eventos</h2>
           <p className="text-slate-gray text-sm">Gerencie os eventos e a escala de cada ministério.</p>
         </div>
         {currentUserRole === 'manager' && (
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button 
-              onClick={() => {
-                setEditingTemplateId(null);
-                setEventTitle('');
-                setEventDescription('');
-                setEventRecurrenceType('single');
-                setIsRecurringModalOpen(true);
-              }} 
-              className="flex items-center gap-2 justify-center py-2.5 px-4 text-xs font-black uppercase tracking-wider text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20 border border-accent-cyan/30 rounded-xl cursor-pointer transition-all"
-            >
-              <RefreshCw size={14} /> Recorrências
-            </button>
-            <button 
-              onClick={() => {
-                setEditingTemplateId(null);
-                setEventTitle('');
-                setEventDescription('');
-                setEventRecurrenceType('single');
-                setIsEventModalOpen(true);
-              }} 
-              className="flex items-center gap-2 justify-center py-2.5 px-4 text-xs font-black uppercase tracking-wider text-navy-950 bg-accent-cyan hover:bg-accent-cyan/80 rounded-xl cursor-pointer transition-all"
-            >
-              <Plus size={14} /> Novo Evento
-            </button>
-          </div>
+          <button 
+            onClick={() => {
+              setEditingTemplateId(null);
+              setEventTitle('');
+              setEventDescription('');
+              setEventRecurrenceType('single');
+              setIsEventModalOpen(true);
+            }} 
+            className="flex items-center gap-2 justify-center py-2.5 px-4 text-xs font-black uppercase tracking-wider text-navy-950 bg-accent-cyan hover:bg-accent-cyan/80 rounded-xl cursor-pointer transition-all"
+          >
+            <Plus size={14} /> Novo Evento
+          </button>
         )}
       </div>
 
@@ -2303,102 +2260,6 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal Gerenciar Recorrências */}
-      <AnimatePresence>
-        {isRecurringModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-card p-6 md:p-8 w-full max-w-lg relative max-h-[85vh] flex flex-col"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-display font-black text-white tracking-tighter uppercase">Eventos Recorrentes</h3>
-                <button 
-                  onClick={() => setIsRecurringModalOpen(false)}
-                  className="p-1.5 bg-navy-800 text-slate-gray rounded-lg hover:text-white transition-colors cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar space-y-4 mb-6">
-                {recurringEvents.length === 0 ? (
-                  <div className="p-8 text-center bg-navy-900/50 rounded-2xl border border-dashed border-navy-800">
-                    <p className="text-sm text-slate-gray">Nenhum evento recorrente cadastrado.</p>
-                  </div>
-                ) : (
-                  recurringEvents.map(template => {
-                    const daysOfWeek = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-                    const dayName = daysOfWeek[template.day_of_week];
-                    const timeStr = template.time.slice(0, 5);
-                    const recurrenceText = template.pattern_type === 'weekly'
-                      ? `Toda semana, no(a) ${dayName} às ${timeStr}`
-                      : `No(a) ${['primeiro(a)', 'segundo(a)', 'terceiro(a)', 'quarto(a)', 'último(a)'][template.week_of_month - 1]} ${dayName} de cada mês às ${timeStr}`;
-
-                    return (
-                      <div key={template.id} className="p-4 rounded-xl bg-navy-900 border border-navy-800 flex justify-between items-center gap-4 hover:border-navy-700 transition-all">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-bold text-white uppercase tracking-tight truncate">{template.title}</h4>
-                          <p className="text-xs text-accent-cyan font-black uppercase tracking-wider mt-1">{recurrenceText}</p>
-                          {template.description && (
-                            <p className="text-xs text-slate-gray mt-1 line-clamp-1">{template.description}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            onClick={() => handleEditTemplate(template)}
-                            className="p-2 bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan hover:text-navy-950 rounded-lg transition-all cursor-pointer"
-                            title="Editar Recorrência"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all cursor-pointer"
-                            title="Excluir Recorrência"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="flex gap-3 mt-auto">
-                <button
-                  onClick={() => setIsRecurringModalOpen(false)}
-                  className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-gray hover:text-white border border-navy-800 hover:bg-navy-900/45 transition-colors cursor-pointer"
-                >
-                  Fechar
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingTemplateId(null);
-                    setEventTitle('');
-                    setEventDescription('');
-                    setEventRecurrenceType('recurring');
-                    setRecurrencePattern('weekly');
-                    setRecurrenceDayOfWeek(0);
-                    setRecurrenceWeekOfMonth(1);
-                    setRecurrenceTime('18:30');
-                    setIsRecurringModalOpen(false);
-                    setIsEventModalOpen(true);
-                  }}
-                  className="flex-1 btn-primary text-sm flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Plus size={14} /> Nova Recorrência
-                </button>
-              </div>
             </motion.div>
           </motion.div>
         )}
