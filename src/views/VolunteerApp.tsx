@@ -482,15 +482,6 @@ export function VolunteerApp() {
                   </div>
                 )}
               </button>
-
-              <button 
-                className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer"
-                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)', color: 'var(--text-secondary)' }}
-                onClick={() => supabase.auth.signOut()}
-                title="Sair"
-              >
-                <LogOut size={18} />
-              </button>
             </div>
           </div>
 
@@ -895,6 +886,17 @@ export function VolunteerApp() {
                       style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
                     >
                       {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
+                  </div>
+
+                  {/* Sair da Conta (Apenas no Perfil) */}
+                  <div className="pt-2">
+                    <button
+                      onClick={() => supabase.auth.signOut()}
+                      className="w-full py-4 border rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all cursor-pointer flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white"
+                      style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                    >
+                      <LogOut size={16} /> Sair da Conta
                     </button>
                   </div>
                 </div>
