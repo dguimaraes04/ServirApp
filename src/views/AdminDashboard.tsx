@@ -296,6 +296,10 @@ function DashboardView() {
   const [newEventTime, setNewEventTime] = useState('09:00');
   const [newEventDescription, setNewEventDescription] = useState('');
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any | null>(null);
+  const [userRole, setUserRole] = useState<string>('');
+  const [dashboardEvents, setDashboardEvents] = useState<any[]>([]);
+  const [eventColor, setEventColor] = useState<string>('#64FFDA');
 
   useEffect(() => { fetchDashboardData(); }, []);
 
@@ -306,12 +310,13 @@ function DashboardView() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('church_id')
+      .select('church_id, role')
       .eq('id', sessionData.session.user.id)
       .single();
 
     if (profile) {
       setChurchId(profile.church_id);
+      setUserRole(profile.role);
       const [
         { count: volCount },
         { data: upcomingEvents },
@@ -323,12 +328,13 @@ function DashboardView() {
         supabase.from('events').select('*').eq('church_id', profile.church_id).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(5),
         supabase.from('ministries').select('*').eq('church_id', profile.church_id).order('name'),
         supabase.from('churches').select('name').eq('id', profile.church_id).single(),
-        supabase.from('events').select('date').eq('church_id', profile.church_id)
+        supabase.from('events').select('id, date, color, title, description').eq('church_id', profile.church_id)
       ]);
 
       setStats({ volunteers: volCount || 0 });
       setNextEvents(upcomingEvents || []);
       setMinistries(mins || []);
+      setDashboardEvents(allEvents || []);
       if (church) setChurchName(church.name || '');
       if (allEvents) {
         const dates = new Set(allEvents.map((e: any) => e.date.split('T')[0]));
@@ -339,10 +345,31 @@ function DashboardView() {
   };
 
   const handleDayClick = (dateStr: string) => {
+    setEditingEvent(null);
+    setEventColor('#64FFDA');
     setSelectedDate(dateStr);
     setNewEventTitle('');
     setNewEventTime('09:00');
     setNewEventDescription('');
+    setIsEventModalOpen(true);
+  };
+
+  const handleEditEventClick = (event: any) => {
+    setEditingEvent(event);
+    setEventColor(event.color || '#64FFDA');
+    setNewEventTitle(event.title);
+    setNewEventDescription(event.description || '');
+    
+    const eventDateObj = new Date(event.date);
+    const yyyy = eventDateObj.getFullYear();
+    const mm = String(eventDateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(eventDateObj.getDate()).padStart(2, '0');
+    setSelectedDate(`${yyyy}-${mm}-${dd}`);
+    
+    const hours = String(eventDateObj.getHours()).padStart(2, '0');
+    const mins = String(eventDateObj.getMinutes()).padStart(2, '0');
+    setNewEventTime(`${hours}:${mins}`);
+    
     setIsEventModalOpen(true);
   };
 
@@ -352,18 +379,33 @@ function DashboardView() {
     setIsCreatingEvent(true);
 
     const dateTime = `${selectedDate}T${newEventTime}:00`;
-    const { error } = await supabase.from('events').insert({
-      church_id: churchId,
-      title: newEventTitle.trim(),
-      description: newEventDescription.trim() || null,
-      date: dateTime,
-    });
+    
+    let error;
+    if (editingEvent) {
+      const res = await supabase.from('events').update({
+        title: newEventTitle.trim(),
+        description: newEventDescription.trim() || null,
+        date: dateTime,
+        color: eventColor
+      }).eq('id', editingEvent.id);
+      error = res.error;
+    } else {
+      const res = await supabase.from('events').insert({
+        church_id: churchId,
+        title: newEventTitle.trim(),
+        description: newEventDescription.trim() || null,
+        date: dateTime,
+        color: eventColor
+      });
+      error = res.error;
+    }
 
     if (!error) {
       setIsEventModalOpen(false);
+      setEditingEvent(null);
       await fetchDashboardData();
     } else {
-      alert('Erro ao criar evento: ' + error.message);
+      alert(`Erro ao ${editingEvent ? 'editar' : 'criar'} evento: ` + error?.message);
     }
     setIsCreatingEvent(false);
   };
@@ -465,22 +507,31 @@ function DashboardView() {
               const day = i + 1;
               const dateStr = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const isToday = day === today.getDate() && calendarDate.getMonth() === today.getMonth() && calendarDate.getFullYear() === today.getFullYear();
-              const hasEvent = eventDates.has(dateStr);
+              const dayEvents = dashboardEvents.filter(e => e.date.split('T')[0] === dateStr);
+              const hasEvent = dayEvents.length > 0;
+              const firstEventColor = dayEvents[0]?.color || '#64FFDA';
               return (
                 <button
                   key={day}
-                  onClick={() => handleDayClick(dateStr)}
+                  onClick={() => {
+                    if (hasEvent) {
+                      handleEditEventClick(dayEvents[0]);
+                    } else {
+                      handleDayClick(dateStr);
+                    }
+                  }}
                   className={`aspect-square flex flex-col items-center justify-center rounded-lg text-xs font-bold relative transition-all cursor-pointer group ${
                     isToday
                       ? 'bg-accent-cyan text-navy-950 shadow-[0_0_12px_rgba(100,255,218,0.4)] hover:shadow-[0_0_20px_rgba(100,255,218,0.6)]'
                       : hasEvent
-                      ? 'bg-navy-800 text-white border border-accent-cyan/30 hover:border-accent-cyan/70 hover:bg-navy-700'
+                      ? 'bg-navy-800 text-white border hover:bg-navy-700'
                       : 'text-slate-gray hover:bg-navy-800 hover:text-white'
                   }`}
+                  style={hasEvent && !isToday ? { borderColor: `${firstEventColor}40` } : {}}
                 >
                   {day}
                   {hasEvent && !isToday && (
-                    <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-accent-cyan" />
+                    <span className="absolute bottom-0.5 w-1 h-1 rounded-full" style={{ backgroundColor: firstEventColor }} />
                   )}
                   {!hasEvent && !isToday && (
                     <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -508,10 +559,19 @@ function DashboardView() {
             ) : (
               nextEvents.map(event => {
                 const d = new Date(event.date);
+                const colorVal = event.color || '#64FFDA';
                 return (
-                  <div key={event.id} className="flex items-center gap-4 p-3 bg-navy-900/60 border border-navy-800 rounded-2xl hover:border-accent-cyan/30 transition-all group">
-                    <div className="w-11 h-11 bg-navy-800 rounded-xl flex flex-col items-center justify-center border border-navy-700 group-hover:border-accent-cyan/40 transition-all flex-shrink-0">
-                      <span className="text-[9px] font-black text-accent-cyan uppercase leading-none">
+                  <button 
+                    key={event.id} 
+                    onClick={() => handleEditEventClick(event)}
+                    className="w-full text-left flex items-center gap-4 p-3 bg-navy-900/60 border border-navy-800 rounded-2xl hover:border-accent-cyan/30 transition-all group cursor-pointer"
+                    style={{ borderLeft: `4px solid ${colorVal}` }}
+                  >
+                    <div 
+                      className="w-11 h-11 bg-navy-800 rounded-xl flex flex-col items-center justify-center border transition-all flex-shrink-0"
+                      style={{ borderColor: `${colorVal}40` }}
+                    >
+                      <span className="text-[9px] font-black uppercase leading-none" style={{ color: colorVal }}>
                         {d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
                       </span>
                       <span className="text-base font-black text-white leading-tight">{d.getDate()}</span>
@@ -521,7 +581,7 @@ function DashboardView() {
                       <p className="text-[10px] text-slate-gray truncate">{event.description || 'Sem descrição'}</p>
                     </div>
                     <ChevronRight size={16} className="text-navy-700 group-hover:text-accent-cyan transition-all flex-shrink-0" />
-                  </div>
+                  </button>
                 );
               })
             )}
@@ -552,13 +612,16 @@ function DashboardView() {
         )}
       </section>
 
-      {/* Modal: Criar Evento */}
+      {/* Modal: Criar/Editar Evento */}
       <AnimatePresence>
         {isEventModalOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setIsEventModalOpen(false)}
+            onClick={() => {
+              setIsEventModalOpen(false);
+              setEditingEvent(null);
+            }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 16 }}
@@ -572,17 +635,22 @@ function DashboardView() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-7 h-7 rounded-lg bg-accent-cyan/10 border border-accent-cyan/20 flex items-center justify-center">
-                      <CalendarDays size={14} className="text-accent-cyan" />
+                      <CalendarDays size={14} className="text-accent-cyan" style={{ color: eventColor }} />
                     </div>
-                    <span className="text-[10px] font-black text-accent-cyan uppercase tracking-widest">Novo Evento</span>
+                    <span className="text-[10px] font-black text-accent-cyan uppercase tracking-widest" style={{ color: eventColor }}>
+                      {editingEvent ? (userRole === 'manager' ? 'Editar Evento' : 'Detalhes do Evento') : 'Novo Evento'}
+                    </span>
                   </div>
                   <h3 className="text-2xl font-display font-black text-white tracking-tighter">
-                    {formatSelectedDate(selectedDate)}
+                    {newEventTitle || 'Sem Título'}
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsEventModalOpen(false)}
-                  className="p-2 text-slate-gray hover:text-white transition-colors"
+                  onClick={() => {
+                    setIsEventModalOpen(false);
+                    setEditingEvent(null);
+                  }}
+                  className="p-2 text-slate-gray hover:text-white transition-colors cursor-pointer"
                 >
                   <X size={20} />
                 </button>
@@ -596,25 +664,74 @@ function DashboardView() {
                   <input
                     type="text"
                     required
+                    disabled={editingEvent && userRole !== 'manager'}
                     autoFocus
                     value={newEventTitle}
                     onChange={e => setNewEventTitle(e.target.value)}
                     placeholder="Ex: Culto de Domingo, Ensaio, Célula..."
-                    className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 transition-all text-sm"
+                    className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 transition-all text-sm disabled:opacity-60"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">
-                    Horário
-                  </label>
-                  <input
-                    type="time"
-                    value={newEventTime}
-                    onChange={e => setNewEventTime(e.target.value)}
-                    className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan/50 transition-all text-sm [color-scheme:dark]"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">
+                      Data
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      disabled={editingEvent && userRole !== 'manager'}
+                      value={selectedDate}
+                      onChange={e => setSelectedDate(e.target.value)}
+                      className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan/50 transition-all text-sm [color-scheme:dark] disabled:opacity-60"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">
+                      Horário
+                    </label>
+                    <input
+                      type="time"
+                      disabled={editingEvent && userRole !== 'manager'}
+                      value={newEventTime}
+                      onChange={e => setNewEventTime(e.target.value)}
+                      className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan/50 transition-all text-sm [color-scheme:dark] disabled:opacity-60"
+                    />
+                  </div>
                 </div>
+
+                {(!editingEvent || userRole === 'manager') && (
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Cor do Culto</label>
+                    <div className="flex flex-wrap gap-2 bg-navy-950/60 p-2 rounded-xl border border-navy-800">
+                      {[
+                        { name: 'Ciano', value: '#64FFDA' },
+                        { name: 'Roxo', value: '#A855F7' },
+                        { name: 'Laranja', value: '#F97316' },
+                        { name: 'Rosa', value: '#EC4899' },
+                        { name: 'Verde', value: '#10B981' },
+                        { name: 'Amarelo', value: '#EAB308' },
+                        { name: 'Azul', value: '#3B82F6' },
+                        { name: 'Vermelho', value: '#EF4444' }
+                      ].map(color => (
+                        <button
+                          key={color.value}
+                          type="button"
+                          onClick={() => setEventColor(color.value)}
+                          className="w-6 h-6 rounded-full transition-all flex items-center justify-center cursor-pointer border border-navy-850 hover:scale-110"
+                          style={{ 
+                            backgroundColor: color.value, 
+                            boxShadow: eventColor === color.value ? `0 0 10px ${color.value}` : 'none',
+                            transform: eventColor === color.value ? 'scale(1.15)' : 'none',
+                            borderColor: eventColor === color.value ? '#ffffff' : 'transparent'
+                          }}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">
@@ -622,32 +739,62 @@ function DashboardView() {
                   </label>
                   <textarea
                     value={newEventDescription}
+                    disabled={editingEvent && userRole !== 'manager'}
                     onChange={e => setNewEventDescription(e.target.value)}
                     placeholder="Observações, local, informações adicionais..."
                     rows={3}
-                    className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 transition-all text-sm resize-none"
+                    className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 transition-all text-sm resize-none disabled:opacity-60"
                   />
                 </div>
 
                 <div className="flex gap-3 pt-2">
+                  {editingEvent && userRole === 'manager' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm(`Excluir o evento "${editingEvent.title}"? Isso removerá todas as escalas vinculadas.`)) {
+                          setIsCreatingEvent(true);
+                          const { error } = await supabase.from('events').delete().eq('id', editingEvent.id);
+                          if (!error) {
+                            setIsEventModalOpen(false);
+                            setEditingEvent(null);
+                            await fetchDashboardData();
+                          } else {
+                            alert('Erro ao excluir evento: ' + error.message);
+                          }
+                          setIsCreatingEvent(false);
+                        }
+                      }}
+                      className="px-4 py-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-500/20 text-xs font-black uppercase tracking-wider cursor-pointer"
+                    >
+                      Excluir
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setIsEventModalOpen(false)}
-                    className="flex-1 py-3 rounded-xl text-sm font-bold text-slate-gray hover:text-white hover:bg-navy-800 transition-colors"
+                    onClick={() => {
+                      setIsEventModalOpen(false);
+                      setEditingEvent(null);
+                    }}
+                    className="flex-1 py-3 rounded-xl text-sm font-bold text-slate-gray hover:text-white hover:bg-navy-800 transition-colors cursor-pointer"
                   >
-                    Cancelar
+                    {editingEvent && userRole !== 'manager' ? 'Fechar' : 'Cancelar'}
                   </button>
-                  <button
-                    type="submit"
-                    disabled={isCreatingEvent || !newEventTitle.trim()}
-                    className="flex-1 py-3 rounded-xl bg-accent-cyan text-navy-950 font-black text-sm uppercase tracking-widest hover:shadow-[0_0_20px_rgba(100,255,218,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isCreatingEvent ? (
-                      <><div className="w-4 h-4 border-2 border-navy-950/30 border-t-navy-950 rounded-full animate-spin" /> Criando...</>
-                    ) : (
-                      <><Plus size={16} /> Criar Evento</>
-                    )}
-                  </button>
+
+                  {(!editingEvent || userRole === 'manager') && (
+                    <button
+                      type="submit"
+                      disabled={isCreatingEvent || !newEventTitle.trim()}
+                      className="flex-1 py-3 rounded-xl bg-accent-cyan text-navy-950 font-black text-sm uppercase tracking-widest hover:shadow-[0_0_20px_rgba(100,255,218,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isCreatingEvent ? (
+                        <><div className="w-4 h-4 border-2 border-navy-950/30 border-t-navy-950 rounded-full animate-spin" /> Salvando...</>
+                      ) : (
+                        <>{editingEvent ? 'Salvar' : 'Criar Evento'}</>
+                      )}
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>
@@ -1620,6 +1767,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [recurrenceWeekOfMonth, setRecurrenceWeekOfMonth] = useState<number>(1);
   const [recurrenceTime, setRecurrenceTime] = useState<string>('18:30');
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [eventColor, setEventColor] = useState<string>('#64FFDA');
   const [allSongs, setAllSongs] = useState<any[]>([]);
   const [selectedSongsForSchedule, setSelectedSongsForSchedule] = useState<any[]>([]);
   const [scheduleSongs, setScheduleSongs] = useState<any[]>([]);
@@ -1707,6 +1855,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
         title: string;
         description: string;
         date: Date;
+        color: string;
       }[] = [];
 
       const today = new Date();
@@ -1738,7 +1887,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
             recurring_event_id: t.id,
             title: t.title,
             description: t.description || '',
-            date: occurrenceDate
+            date: occurrenceDate,
+            color: t.color || '#64FFDA'
           });
         });
       }
@@ -1755,10 +1905,11 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
 
         if (match) {
           toKeepIds.add(match.id);
-          if (match.title !== expected.title || match.description !== expected.description) {
+          if (match.title !== expected.title || match.description !== expected.description || match.color !== expected.color) {
             supabase.from('events').update({
               title: expected.title,
-              description: expected.description
+              description: expected.description,
+              color: expected.color
             }).eq('id', match.id).then();
           }
         } else {
@@ -1767,7 +1918,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
             recurring_event_id: expected.recurring_event_id,
             title: expected.title,
             description: expected.description,
-            date: expected.date.toISOString()
+            date: expected.date.toISOString(),
+            color: expected.color
           });
         }
       });
@@ -1801,7 +1953,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           church_id: churchId,
           title: eventTitle,
           date: eventDate,
-          description: eventDescription
+          description: eventDescription,
+          color: eventColor
         });
         if (error) throw error;
       } else {
@@ -1813,7 +1966,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           pattern_type: recurrencePattern,
           day_of_week: recurrenceDayOfWeek,
           week_of_month: recurrencePattern === 'monthly_nth_day' ? recurrenceWeekOfMonth : null,
-          time: recurrenceTime + ':00'
+          time: recurrenceTime + ':00',
+          color: eventColor
         };
 
         if (editingTemplateId) {
@@ -2238,6 +2392,36 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                     </div>
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Cor do Culto</label>
+                  <div className="flex flex-wrap gap-2 bg-navy-950/60 p-2 rounded-xl border border-navy-800">
+                    {[
+                      { name: 'Ciano', value: '#64FFDA' },
+                      { name: 'Roxo', value: '#A855F7' },
+                      { name: 'Laranja', value: '#F97316' },
+                      { name: 'Rosa', value: '#EC4899' },
+                      { name: 'Verde', value: '#10B981' },
+                      { name: 'Amarelo', value: '#EAB308' },
+                      { name: 'Azul', value: '#3B82F6' },
+                      { name: 'Vermelho', value: '#EF4444' }
+                    ].map(color => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        onClick={() => setEventColor(color.value)}
+                        className="w-6 h-6 rounded-full transition-all flex items-center justify-center cursor-pointer border border-navy-850 hover:scale-110"
+                        style={{ 
+                          backgroundColor: color.value, 
+                          boxShadow: eventColor === color.value ? `0 0 10px ${color.value}` : 'none',
+                          transform: eventColor === color.value ? 'scale(1.15)' : 'none',
+                          borderColor: eventColor === color.value ? '#ffffff' : 'transparent'
+                        }}
+                        title={color.name}
+                      />
+                    ))}
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Descrição (Opcional)</label>
