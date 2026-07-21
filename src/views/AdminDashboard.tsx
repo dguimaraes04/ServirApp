@@ -214,11 +214,6 @@ export function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-4 lg:gap-6">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}>
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent)' }}></div>
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Sistema Operante</span>
-            </div>
-            
             <button className="relative p-2 transition-colors" style={{ color: 'var(--text-secondary)' }}>
               <Bell size={22} />
               {pendingConfirms > 0 && (
