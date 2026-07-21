@@ -439,7 +439,7 @@ function DashboardView() {
         supabase.from('events').select('*').eq('church_id', profile.church_id).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(5),
         supabase.from('ministries').select('*').eq('church_id', profile.church_id).order('name'),
         supabase.from('churches').select('name').eq('id', profile.church_id).single(),
-        supabase.from('events').select('id, date, color, title, description').eq('church_id', profile.church_id)
+        supabase.from('events').select('id, date, color, title, description, recurring_event_id').eq('church_id', profile.church_id)
       ]);
 
       setStats({ volunteers: volCount || 0 });
@@ -484,10 +484,21 @@ function DashboardView() {
     setIsEventModalOpen(true);
   };
 
-  const executeDeleteEventDashboard = async (event: any, mode: 'single' | 'all') => {
+  const executeDeleteEventDashboard = async (event: any, mode: 'single' | 'all' | 'series') => {
     try {
       setIsCreatingEvent(true);
-      if (mode === 'all' && event.recurring_event_id) {
+      if (mode === 'series' && event.recurring_event_id) {
+        // Delete ALL events from this series (past + future)
+        await supabase.from('events')
+          .delete()
+          .eq('recurring_event_id', event.recurring_event_id);
+
+        // Delete the template
+        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
+
+        // Sync to restore any overridden events
+        await syncRecurringEvents(churchId);
+      } else if (mode === 'all' && event.recurring_event_id) {
         // 1. Delete all future events generated from this template
         await supabase.from('events')
           .delete()
@@ -1022,7 +1033,19 @@ function DashboardView() {
                   }}
                   className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-red-650 hover:bg-red-500 hover:text-white transition-all border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)] cursor-pointer"
                 >
-                  Excluir TODOS os cultos futuros (série)
+                  Excluir todos os cultos futuros (série)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeDeleteEventDashboard(editingEvent, 'series');
+                    setIsDeleteConfirmOpen(false);
+                    setEditingEvent(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-red-400 bg-red-950/60 hover:bg-red-900/80 transition-all border border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.4)] cursor-pointer"
+                >
+                  ⚠ Excluir TODA a série (incluindo cultos passados)
                 </button>
                 
                 <button
@@ -2134,9 +2157,20 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
     }
   };
 
-  const executeDeleteEvent = async (event: any, mode: 'single' | 'all') => {
+  const executeDeleteEvent = async (event: any, mode: 'single' | 'all' | 'series') => {
     try {
-      if (mode === 'all' && event.recurring_event_id) {
+      if (mode === 'series' && event.recurring_event_id) {
+        // Delete ALL events from this series (past + future)
+        await supabase.from('events')
+          .delete()
+          .eq('recurring_event_id', event.recurring_event_id);
+
+        // Delete the template
+        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
+
+        // Sync to restore any overridden events
+        await syncRecurringEvents(churchId);
+      } else if (mode === 'all' && event.recurring_event_id) {
         // 1. Delete all future events generated from this template
         await supabase.from('events')
           .delete()
@@ -2695,7 +2729,19 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                   }}
                   className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-red-650 hover:bg-red-500 hover:text-white transition-all border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)] cursor-pointer"
                 >
-                  Excluir TODOS os cultos futuros (série)
+                  Excluir todos os cultos futuros (série)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeDeleteEvent(deletingEvent, 'series');
+                    setIsDeleteConfirmOpen(false);
+                    setDeletingEvent(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-red-400 bg-red-950/60 hover:bg-red-900/80 transition-all border border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.4)] cursor-pointer"
+                >
+                  ⚠ Excluir TODA a série (incluindo cultos passados)
                 </button>
                 
                 <button
