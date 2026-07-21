@@ -488,27 +488,17 @@ function DashboardView() {
     try {
       setIsCreatingEvent(true);
       if (mode === 'series' && event.recurring_event_id) {
-        // Delete ALL events from this series (past + future)
-        await supabase.from('events')
-          .delete()
-          .eq('recurring_event_id', event.recurring_event_id);
-
-        // Delete the template
+        // ON DELETE CASCADE: deleting the template automatically removes ALL linked events
         await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
-
-        // Sync to restore any overridden events
         await syncRecurringEvents(churchId);
       } else if (mode === 'all' && event.recurring_event_id) {
-        // 1. Delete all future events generated from this template
+        // Delete future events from this series only
         await supabase.from('events')
           .delete()
           .eq('recurring_event_id', event.recurring_event_id)
           .gte('date', event.date);
-
-        // 2. Delete the template from recurring_events
+        // Delete the template (cascade handles remaining instances)
         await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
-          
-        // 3. Sync other templates to restore overridden events
         await syncRecurringEvents(churchId);
       } else {
         // Mode 'single': Delete only this event instance
@@ -2160,27 +2150,17 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const executeDeleteEvent = async (event: any, mode: 'single' | 'all' | 'series') => {
     try {
       if (mode === 'series' && event.recurring_event_id) {
-        // Delete ALL events from this series (past + future)
-        await supabase.from('events')
-          .delete()
-          .eq('recurring_event_id', event.recurring_event_id);
-
-        // Delete the template
+        // ON DELETE CASCADE: deleting the template automatically removes ALL linked events
         await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
-
-        // Sync to restore any overridden events
         await syncRecurringEvents(churchId);
       } else if (mode === 'all' && event.recurring_event_id) {
-        // 1. Delete all future events generated from this template
+        // Delete future events from this series only
         await supabase.from('events')
           .delete()
           .eq('recurring_event_id', event.recurring_event_id)
           .gte('date', event.date);
-
-        // 2. Delete the template from recurring_events
+        // Delete the template (cascade handles remaining instances)
         await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
-          
-        // 3. Sync other templates to restore overridden events
         await syncRecurringEvents(churchId);
       } else {
         // Mode 'single': Delete only this event instance
