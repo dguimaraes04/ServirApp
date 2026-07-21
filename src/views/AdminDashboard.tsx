@@ -278,6 +278,116 @@ function NavItem({ icon, label, active, onClick }: { icon: ReactNode, label: str
   );
 }
 
+const syncRecurringEvents = async (cid: string) => {
+  try {
+    const { data: templates } = await supabase
+      .from('recurring_events')
+      .select('*')
+      .eq('church_id', cid);
+
+    if (!templates) return;
+
+    const sixMonthsFromNow = new Date();
+    sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+    
+    const { data: existingEvents } = await supabase
+      .from('events')
+      .select('*')
+      .eq('church_id', cid)
+      .not('recurring_event_id', 'is', null)
+      .gte('date', new Date().toISOString())
+      .lte('date', sixMonthsFromNow.toISOString());
+
+    const existingEventsList = existingEvents || [];
+    const expectedEvents: {
+      recurring_event_id: string;
+      title: string;
+      description: string;
+      date: Date;
+      color: string;
+    }[] = [];
+
+    const today = new Date();
+    for (let d = new Date(today); d <= sixMonthsFromNow; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay();
+      const weekOfMonth = Math.ceil(d.getDate() / 7);
+
+      const matchingTemplates = templates.filter(t => {
+        if (t.day_of_week !== dayOfWeek) return false;
+        if (t.pattern_type === 'weekly') return true;
+        if (t.pattern_type === 'monthly_nth_day') {
+          return t.week_of_month === weekOfMonth;
+        }
+        return false;
+      });
+
+      if (matchingTemplates.length === 0) continue;
+
+      // Precedence: monthly overrides weekly
+      const monthlyTemplates = matchingTemplates.filter(t => t.pattern_type === 'monthly_nth_day');
+      const finalTemplates = monthlyTemplates.length > 0 ? monthlyTemplates : matchingTemplates;
+
+      finalTemplates.forEach(t => {
+        const [hours, minutes] = t.time.split(':').map(Number);
+        const occurrenceDate = new Date(d);
+        occurrenceDate.setHours(hours, minutes, 0, 0);
+
+        expectedEvents.push({
+          recurring_event_id: t.id,
+          title: t.title,
+          description: t.description || '',
+          date: occurrenceDate,
+          color: t.color || '#64FFDA'
+        });
+      });
+    }
+
+    const toInsert: any[] = [];
+    const toKeepIds = new Set<string>();
+
+    expectedEvents.forEach(expected => {
+      const match = existingEventsList.find(existing => {
+        const expectedTime = expected.date.getTime();
+        const existingTime = new Date(existing.date).getTime();
+        return existing.recurring_event_id === expected.recurring_event_id && Math.abs(expectedTime - existingTime) < 60000;
+      });
+
+      if (match) {
+        toKeepIds.add(match.id);
+        if (match.title !== expected.title || match.description !== expected.description || match.color !== expected.color) {
+          supabase.from('events').update({
+            title: expected.title,
+            description: expected.description,
+            color: expected.color
+          }).eq('id', match.id).then();
+        }
+      } else {
+        toInsert.push({
+          church_id: cid,
+          recurring_event_id: expected.recurring_event_id,
+          title: expected.title,
+          description: expected.description,
+          date: expected.date.toISOString(),
+          color: expected.color
+        });
+      }
+    });
+
+    const toDelete = existingEventsList.filter(existing => !toKeepIds.has(existing.id));
+
+    if (toDelete.length > 0) {
+      const deleteIds = toDelete.map(d => d.id);
+      await supabase.from('events').delete().in('id', deleteIds);
+    }
+
+    if (toInsert.length > 0) {
+      await supabase.from('events').insert(toInsert);
+    }
+  } catch (error) {
+    console.error('Error syncing recurring events:', error);
+  }
+};
+
 // Reusing views components from App.tsx
 function DashboardView() {
   const [churchName, setChurchName] = useState('');
@@ -300,6 +410,7 @@ function DashboardView() {
   const [userRole, setUserRole] = useState<string>('');
   const [dashboardEvents, setDashboardEvents] = useState<any[]>([]);
   const [eventColor, setEventColor] = useState<string>('#64FFDA');
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   useEffect(() => { fetchDashboardData(); }, []);
 
@@ -371,6 +482,85 @@ function DashboardView() {
     setNewEventTime(`${hours}:${mins}`);
     
     setIsEventModalOpen(true);
+  };
+
+  const executeDeleteEventDashboard = async (event: any, mode: 'single' | 'all') => {
+    try {
+      setIsCreatingEvent(true);
+      if (mode === 'all' && event.recurring_event_id) {
+        // 1. Delete the template from recurring_events
+        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
+        
+        // 2. Delete all future events generated from this template
+        await supabase.from('events')
+          .delete()
+          .eq('recurring_event_id', event.recurring_event_id)
+          .gte('date', event.date);
+          
+        // 3. Sync other templates to restore overridden events
+        await syncRecurringEvents(churchId);
+      } else {
+        // Mode 'single': Delete only this event instance
+        await supabase.from('events').delete().eq('id', event.id);
+        
+        // If it was a recurring event, look for other templates that match this date
+        // to restore the overridden event on this day
+        if (event.recurring_event_id) {
+          const eventDateObj = new Date(event.date);
+          const dayOfWeek = eventDateObj.getDay();
+          const weekOfMonth = Math.ceil(eventDateObj.getDate() / 7);
+          
+          const { data: templates } = await supabase
+            .from('recurring_events')
+            .select('*')
+            .eq('church_id', churchId);
+            
+          if (templates) {
+            const matchingTemplates = templates.filter(t => {
+              if (t.id === event.recurring_event_id) return false;
+              if (t.day_of_week !== dayOfWeek) return false;
+              if (t.pattern_type === 'weekly') return true;
+              if (t.pattern_type === 'monthly_nth_day') {
+                return t.week_of_month === weekOfMonth;
+              }
+              return false;
+            });
+            
+            if (matchingTemplates.length > 0) {
+              const monthly = matchingTemplates.find(t => t.pattern_type === 'monthly_nth_day');
+              const toRestore = monthly || matchingTemplates[0];
+              
+              await supabase.from('events').insert({
+                church_id: churchId,
+                recurring_event_id: toRestore.id,
+                title: toRestore.title,
+                description: toRestore.description || null,
+                date: event.date,
+                color: toRestore.color
+              });
+            }
+          }
+        }
+      }
+      setIsEventModalOpen(false);
+      setEditingEvent(null);
+      await fetchDashboardData();
+    } catch (err) {
+      console.error('Error deleting event:', err);
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
+
+  const handleDeleteClickDashboard = (event: any) => {
+    if (!event.recurring_event_id) {
+      if (window.confirm(`Excluir o evento "${event.title}"? Isso removerá todas as escalas vinculadas.`)) {
+        executeDeleteEventDashboard(event, 'single');
+      }
+    } else {
+      setIsEventModalOpen(false); // Close main event modal
+      setIsDeleteConfirmOpen(true); // Open delete confirmation modal
+    }
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -751,20 +941,7 @@ function DashboardView() {
                   {editingEvent && userRole === 'manager' && (
                     <button
                       type="button"
-                      onClick={async () => {
-                        if (window.confirm(`Excluir o evento "${editingEvent.title}"? Isso removerá todas as escalas vinculadas.`)) {
-                          setIsCreatingEvent(true);
-                          const { error } = await supabase.from('events').delete().eq('id', editingEvent.id);
-                          if (!error) {
-                            setIsEventModalOpen(false);
-                            setEditingEvent(null);
-                            await fetchDashboardData();
-                          } else {
-                            alert('Erro ao excluir evento: ' + error.message);
-                          }
-                          setIsCreatingEvent(false);
-                        }
-                      }}
+                      onClick={() => handleDeleteClickDashboard(editingEvent)}
                       className="px-4 py-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-500/20 text-xs font-black uppercase tracking-wider cursor-pointer"
                     >
                       Excluir
@@ -797,6 +974,68 @@ function DashboardView() {
                   )}
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Confirmação de Exclusão Dashboard */}
+      <AnimatePresence>
+        {isDeleteConfirmOpen && editingEvent && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setIsDeleteConfirmOpen(false);
+              setEditingEvent(null);
+            }}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="glass-card p-6 w-full max-w-sm relative text-center"
+            >
+              <h3 className="text-xl font-display font-black text-white tracking-tighter uppercase mb-2">Excluir Evento</h3>
+              <p className="text-xs text-slate-gray mb-6">
+                O evento <strong className="text-white">"{editingEvent.title}"</strong> é recorrente. Escolha a opção de exclusão desejada:
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeDeleteEventDashboard(editingEvent, 'single');
+                    setIsDeleteConfirmOpen(false);
+                    setEditingEvent(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-navy-800 hover:bg-navy-700 transition-all border border-navy-700 cursor-pointer"
+                >
+                  Excluir APENAS este culto
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeDeleteEventDashboard(editingEvent, 'all');
+                    setIsDeleteConfirmOpen(false);
+                    setEditingEvent(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-red-650 hover:bg-red-500 hover:text-white transition-all border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)] cursor-pointer"
+                >
+                  Excluir TODOS os cultos futuros (série)
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setEditingEvent(null);
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-gray hover:text-white transition-all cursor-pointer"
+                >
+                  Voltar / Cancelar
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -1772,6 +2011,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [selectedSongsForSchedule, setSelectedSongsForSchedule] = useState<any[]>([]);
   const [scheduleSongs, setScheduleSongs] = useState<any[]>([]);
   const [leadMinistriesIds, setLeadMinistriesIds] = useState<string[]>([]);
+  const [deletingEvent, setDeletingEvent] = useState<any | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -1829,115 +2070,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
     setLoading(false);
   };
 
-  const syncRecurringEvents = async (cid: string) => {
-    try {
-      const { data: templates } = await supabase
-        .from('recurring_events')
-        .select('*')
-        .eq('church_id', cid);
 
-      if (!templates) return;
-
-      const sixMonthsFromNow = new Date();
-      sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
-      
-      const { data: existingEvents } = await supabase
-        .from('events')
-        .select('*')
-        .eq('church_id', cid)
-        .not('recurring_event_id', 'is', null)
-        .gte('date', new Date().toISOString())
-        .lte('date', sixMonthsFromNow.toISOString());
-
-      const existingEventsList = existingEvents || [];
-      const expectedEvents: {
-        recurring_event_id: string;
-        title: string;
-        description: string;
-        date: Date;
-        color: string;
-      }[] = [];
-
-      const today = new Date();
-      for (let d = new Date(today); d <= sixMonthsFromNow; d.setDate(d.getDate() + 1)) {
-        const dayOfWeek = d.getDay();
-        const weekOfMonth = Math.ceil(d.getDate() / 7);
-
-        const matchingTemplates = templates.filter(t => {
-          if (t.day_of_week !== dayOfWeek) return false;
-          if (t.pattern_type === 'weekly') return true;
-          if (t.pattern_type === 'monthly_nth_day') {
-            return t.week_of_month === weekOfMonth;
-          }
-          return false;
-        });
-
-        if (matchingTemplates.length === 0) continue;
-
-        // Precedence: monthly overrides weekly
-        const monthlyTemplates = matchingTemplates.filter(t => t.pattern_type === 'monthly_nth_day');
-        const finalTemplates = monthlyTemplates.length > 0 ? monthlyTemplates : matchingTemplates;
-
-        finalTemplates.forEach(t => {
-          const [hours, minutes] = t.time.split(':').map(Number);
-          const occurrenceDate = new Date(d);
-          occurrenceDate.setHours(hours, minutes, 0, 0);
-
-          expectedEvents.push({
-            recurring_event_id: t.id,
-            title: t.title,
-            description: t.description || '',
-            date: occurrenceDate,
-            color: t.color || '#64FFDA'
-          });
-        });
-      }
-
-      const toInsert: any[] = [];
-      const toKeepIds = new Set<string>();
-
-      expectedEvents.forEach(expected => {
-        const match = existingEventsList.find(existing => {
-          const expectedTime = expected.date.getTime();
-          const existingTime = new Date(existing.date).getTime();
-          return existing.recurring_event_id === expected.recurring_event_id && Math.abs(expectedTime - existingTime) < 60000;
-        });
-
-        if (match) {
-          toKeepIds.add(match.id);
-          if (match.title !== expected.title || match.description !== expected.description || match.color !== expected.color) {
-            supabase.from('events').update({
-              title: expected.title,
-              description: expected.description,
-              color: expected.color
-            }).eq('id', match.id).then();
-          }
-        } else {
-          toInsert.push({
-            church_id: cid,
-            recurring_event_id: expected.recurring_event_id,
-            title: expected.title,
-            description: expected.description,
-            date: expected.date.toISOString(),
-            color: expected.color
-          });
-        }
-      });
-
-      const toDelete = existingEventsList.filter(existing => !toKeepIds.has(existing.id));
-
-      if (toDelete.length > 0) {
-        const deleteIds = toDelete.map(d => d.id);
-        await supabase.from('events').delete().in('id', deleteIds);
-      }
-
-      if (toInsert.length > 0) {
-        await supabase.from('events').insert(toInsert);
-      }
-    } catch (error) {
-      console.error('Error syncing recurring events:', error);
-    }
-  };
 
 
 
@@ -1998,6 +2131,80 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
       alert('Erro ao salvar evento.');
     } finally {
       setIsSubmittingEvent(false);
+    }
+  };
+
+  const executeDeleteEvent = async (event: any, mode: 'single' | 'all') => {
+    try {
+      if (mode === 'all' && event.recurring_event_id) {
+        // 1. Delete the template from recurring_events
+        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
+        
+        // 2. Delete all future events generated from this template
+        await supabase.from('events')
+          .delete()
+          .eq('recurring_event_id', event.recurring_event_id)
+          .gte('date', event.date);
+          
+        // 3. Sync other templates to restore overridden events
+        await syncRecurringEvents(churchId);
+      } else {
+        // Mode 'single': Delete only this event instance
+        await supabase.from('events').delete().eq('id', event.id);
+        
+        // If it was a recurring event, look for other templates that match this date
+        // to restore the overridden event on this day
+        if (event.recurring_event_id) {
+          const eventDateObj = new Date(event.date);
+          const dayOfWeek = eventDateObj.getDay();
+          const weekOfMonth = Math.ceil(eventDateObj.getDate() / 7);
+          
+          const { data: templates } = await supabase
+            .from('recurring_events')
+            .select('*')
+            .eq('church_id', churchId);
+            
+          if (templates) {
+            const matchingTemplates = templates.filter(t => {
+              if (t.id === event.recurring_event_id) return false;
+              if (t.day_of_week !== dayOfWeek) return false;
+              if (t.pattern_type === 'weekly') return true;
+              if (t.pattern_type === 'monthly_nth_day') {
+                return t.week_of_month === weekOfMonth;
+              }
+              return false;
+            });
+            
+            if (matchingTemplates.length > 0) {
+              const monthly = matchingTemplates.find(t => t.pattern_type === 'monthly_nth_day');
+              const toRestore = monthly || matchingTemplates[0];
+              
+              await supabase.from('events').insert({
+                church_id: churchId,
+                recurring_event_id: toRestore.id,
+                title: toRestore.title,
+                description: toRestore.description || null,
+                date: event.date,
+                color: toRestore.color
+              });
+            }
+          }
+        }
+      }
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting event:', err);
+    }
+  };
+
+  const handleDeleteClick = (event: any) => {
+    if (!event.recurring_event_id) {
+      if (window.confirm(`Excluir o evento "${event.title}"? Isso removerá todas as escalas vinculadas.`)) {
+        executeDeleteEvent(event, 'single');
+      }
+    } else {
+      setDeletingEvent(event);
+      setIsDeleteConfirmOpen(true);
     }
   };
 
@@ -2188,11 +2395,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                   )}
                   {currentUserRole === 'manager' && (
                     <button 
-                      onClick={() => {
-                        if (window.confirm(`Excluir o evento "${event.title}"? Isso removerá todas as escalas vinculadas.`)) {
-                          supabase.from('events').delete().eq('id', event.id).then(() => fetchData());
-                        }
-                      }}
+                      onClick={() => handleDeleteClick(event)}
                       className="p-2.5 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 hover:text-white transition-all border border-red-500/20 cursor-pointer"
                       title="Excluir Evento"
                     >
@@ -2444,6 +2647,68 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <AnimatePresence>
+        {isDeleteConfirmOpen && deletingEvent && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setIsDeleteConfirmOpen(false);
+              setDeletingEvent(null);
+            }}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="glass-card p-6 w-full max-w-sm relative text-center"
+            >
+              <h3 className="text-xl font-display font-black text-white tracking-tighter uppercase mb-2">Excluir Evento</h3>
+              <p className="text-xs text-slate-gray mb-6">
+                O evento <strong className="text-white">"{deletingEvent.title}"</strong> é recorrente. Escolha a opção de exclusão desejada:
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeDeleteEvent(deletingEvent, 'single');
+                    setIsDeleteConfirmOpen(false);
+                    setDeletingEvent(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-navy-800 hover:bg-navy-700 transition-all border border-navy-700 cursor-pointer"
+                >
+                  Excluir APENAS este culto
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeDeleteEvent(deletingEvent, 'all');
+                    setIsDeleteConfirmOpen(false);
+                    setDeletingEvent(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-red-650 hover:bg-red-500 hover:text-white transition-all border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)] cursor-pointer"
+                >
+                  Excluir TODOS os cultos futuros (série)
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setDeletingEvent(null);
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-gray hover:text-white transition-all cursor-pointer"
+                >
+                  Voltar / Cancelar
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
