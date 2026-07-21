@@ -488,14 +488,14 @@ function DashboardView() {
     try {
       setIsCreatingEvent(true);
       if (mode === 'all' && event.recurring_event_id) {
-        // 1. Delete the template from recurring_events
-        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
-        
-        // 2. Delete all future events generated from this template
+        // 1. Delete all future events generated from this template
         await supabase.from('events')
           .delete()
           .eq('recurring_event_id', event.recurring_event_id)
           .gte('date', event.date);
+
+        // 2. Delete the template from recurring_events
+        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
           
         // 3. Sync other templates to restore overridden events
         await syncRecurringEvents(churchId);
@@ -2137,14 +2137,14 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const executeDeleteEvent = async (event: any, mode: 'single' | 'all') => {
     try {
       if (mode === 'all' && event.recurring_event_id) {
-        // 1. Delete the template from recurring_events
-        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
-        
-        // 2. Delete all future events generated from this template
+        // 1. Delete all future events generated from this template
         await supabase.from('events')
           .delete()
           .eq('recurring_event_id', event.recurring_event_id)
           .gte('date', event.date);
+
+        // 2. Delete the template from recurring_events
+        await supabase.from('recurring_events').delete().eq('id', event.recurring_event_id);
           
         // 3. Sync other templates to restore overridden events
         await syncRecurringEvents(churchId);
