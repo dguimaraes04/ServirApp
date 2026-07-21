@@ -719,12 +719,18 @@ function DashboardView() {
                   }}
                   className={`aspect-square flex flex-col items-center justify-center rounded-lg text-xs font-bold relative transition-all cursor-pointer group ${
                     isToday
-                      ? 'bg-accent-cyan text-navy-950 shadow-[0_0_12px_rgba(100,255,218,0.4)] hover:shadow-[0_0_20px_rgba(100,255,218,0.6)]'
+                      ? 'shadow-md font-black'
                       : hasEvent
-                      ? 'bg-navy-800 text-white border hover:bg-navy-700'
-                      : 'text-slate-gray hover:bg-navy-800 hover:text-white'
+                      ? 'border font-bold'
+                      : 'font-medium hover:bg-black/5 dark:hover:bg-white/5'
                   }`}
-                  style={hasEvent && !isToday ? { borderColor: `${firstEventColor}40` } : {}}
+                  style={
+                    isToday
+                      ? { backgroundColor: 'var(--accent)', color: '#FFFFFF' }
+                      : hasEvent
+                      ? { borderColor: `${firstEventColor}60`, backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }
+                      : { color: 'var(--text-primary)' }
+                  }
                 >
                   {day}
                   {hasEvent && !isToday && (

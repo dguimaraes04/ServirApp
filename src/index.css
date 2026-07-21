@@ -52,24 +52,122 @@ html.dark {
 
 /* ─── LIGHT THEME (new default) ────────────────────────── */
 html.light, html:not(.dark) {
-  --bg-base:        #F0F6FF;
+  --bg-base:        #F1F5F9;
   --bg-surface:     #FFFFFF;
-  --bg-elevated:    rgba(255,255,255,0.85);
-  --bg-input:       #F8FAFF;
-  --border-main:    #DBEAFE;
-  --border-subtle:  #E8F0FE;
-  --text-primary:   #1E3A5F;
-  --text-secondary: #6B7FA3;
-  --text-heading:   #0F2850;
-  --accent:         #2563EB;
-  --accent-subtle:  rgba(37,99,235,0.08);
-  --accent-border:  rgba(37,99,235,0.25);
+  --bg-elevated:    #FFFFFF;
+  --bg-input:       #FFFFFF;
+  --border-main:    #CBD5E1;
+  --border-subtle:  #E2E8F0;
+
+  --text-primary:   #0F172A; /* Deep dark slate - WCAG AAA readability */
+  --text-secondary: #334155; /* Slate 700 - high contrast label text */
+  --text-heading:   #020617; /* Pitch dark navy heading text */
+
+  --accent:         #2563EB; /* Vivid Royal Blue (matching user photo) */
+  --accent-subtle:  rgba(37,99,235,0.12);
+  --accent-border:  rgba(37,99,235,0.35);
   --accent-text:    #FFFFFF;
-  --nav-active-bg:  rgba(37,99,235,0.1);
-  --nav-active-shadow: inset 0 0 0 1px rgba(37,99,235,0.2);
-  --card-shadow:    0 4px 24px rgba(37,99,235,0.07);
-  --scrollbar:      #BFDBFE;
-  --scrollbar-hover:#93C5FD;
+
+  --nav-active-bg:  #DBEAFE;
+  --nav-active-shadow: inset 0 0 0 1px #93C5FD;
+  --card-shadow:    0 4px 20px -2px rgba(15, 23, 42, 0.08);
+  --scrollbar:      #94A3B8;
+  --scrollbar-hover:#64748B;
+}
+
+/* ─── LIGHT THEME CONTRAST OVERRIDES FOR LEGACY CLASSES ──── */
+html.light, html:not(.dark) {
+  /* Replace faint cyan text with Royal Blue */
+  .text-accent-cyan {
+    color: #1D4ED8 !important;
+  }
+
+  /* Replace pale gray text with dark slate */
+  .text-slate-gray {
+    color: #334155 !important;
+  }
+
+  .text-slate-light {
+    color: #0F172A !important;
+  }
+
+  /* Ensure text-white on light backgrounds renders crisp dark slate */
+  .glass-card .text-white,
+  main .text-white,
+  aside .text-white,
+  header .text-white,
+  section .text-white,
+  p.text-white,
+  h1.text-white,
+  h2.text-white,
+  h3.text-white,
+  h4.text-white,
+  span.text-white {
+    color: #0F172A;
+  }
+
+  /* Keep text white inside solid dark/accent elements */
+  .btn-primary,
+  .btn-primary *,
+  .bg-accent-cyan,
+  .bg-accent-cyan *,
+  .bg-blue-600,
+  .bg-blue-600 *,
+  .bg-blue-500,
+  .bg-blue-500 *,
+  .bg-red-500,
+  .bg-red-500 *,
+  .bg-green-500,
+  .bg-green-500 *,
+  .bg-navy-950,
+  .bg-navy-950 *,
+  .bg-navy-900,
+  .bg-navy-900 *,
+  .bg-navy-800,
+  .bg-navy-800 * {
+    color: #FFFFFF !important;
+  }
+
+  /* Style accent-cyan background elements with Royal Blue in light mode */
+  .bg-accent-cyan {
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
+  }
+
+  .bg-accent-cyan\/10 {
+    background-color: rgba(37, 99, 235, 0.12) !important;
+  }
+
+  .border-accent-cyan\/20,
+  .border-accent-cyan\/30,
+  .border-accent-cyan\/50 {
+    border-color: rgba(37, 99, 235, 0.35) !important;
+  }
+
+  /* Card and input background overrides */
+  .bg-navy-950\/50,
+  .bg-navy-950\/60,
+  .bg-navy-950\/80 {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+  }
+
+  .bg-navy-900\/60,
+  .bg-navy-900\/50,
+  .bg-navy-900 {
+    background-color: #F8FAFC !important;
+    border-color: #E2E8F0 !important;
+  }
+
+  .bg-navy-800 {
+    background-color: #F1F5F9 !important;
+    border-color: #CBD5E1 !important;
+  }
+
+  .border-navy-800,
+  .border-navy-700 {
+    border-color: #CBD5E1 !important;
+  }
 }
 
 /* ─── BASE ──────────────────────────────────────────────── */
@@ -165,7 +263,7 @@ html.light, html:not(.dark) {
 }
 .theme-input::placeholder {
   color: var(--text-secondary);
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 /* ─── SCROLLBAR ─────────────────────────────────────────── */
@@ -182,3 +280,4 @@ html.light, html:not(.dark) {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-hover);
 }
+
