@@ -29,7 +29,9 @@ import {
   X,
   Camera,
   CalendarDays,
-  ChevronLeft
+  ChevronLeft,
+  RefreshCw,
+  Repeat
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -1607,6 +1609,19 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
       return name.includes('louvor') || name.includes('música') || name.includes('musica') || name.includes('worship');
     });
   }, [ministries]);
+
+  // Recurrence states
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+  const [recurringEvents, setRecurringEvents] = useState<any[]>([]);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+
+  // Recurrence form states
+  const [eventRecurrenceType, setEventRecurrenceType] = useState<'single' | 'recurring'>('single');
+  const [recurrencePattern, setRecurrencePattern] = useState<'weekly' | 'monthly_nth_day'>('weekly');
+  const [recurrenceDayOfWeek, setRecurrenceDayOfWeek] = useState<number>(0); // 0 = Sunday
+  const [recurrenceWeekOfMonth, setRecurrenceWeekOfMonth] = useState<number>(1);
+  const [recurrenceTime, setRecurrenceTime] = useState<string>('18:30');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [allSongs, setAllSongs] = useState<any[]>([]);
   const [selectedSongsForSchedule, setSelectedSongsForSchedule] = useState<any[]>([]);
   const [scheduleSongs, setScheduleSongs] = useState<any[]>([]);
@@ -1634,7 +1649,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           { data: vols },
           { data: volMins },
           { data: songs },
-          { data: schSongs }
+          { data: schSongs },
+          { data: recurrings }
         ] = await Promise.all([
           supabase.from('events').select('*').eq('church_id', profile.church_id).order('date', { ascending: true }),
           supabase.from('ministries').select('*').eq('church_id', profile.church_id).order('name'),
@@ -1643,7 +1659,8 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           supabase.from('profiles').select('*').eq('church_id', profile.church_id).order('full_name'),
           supabase.from('volunteer_ministries').select('*'),
           supabase.from('songs').select('*').eq('church_id', profile.church_id).order('title'),
-          supabase.from('schedule_songs').select('*, songs(*)')
+          supabase.from('schedule_songs').select('*, songs(*)'),
+          supabase.from('recurring_events').select('*').eq('church_id', profile.church_id).order('created_at', { ascending: false })
         ]);
 
         if (evs) setEvents(evs);
@@ -1655,6 +1672,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
         if (songs) setAllSongs(songs);
         if (schSongs) setScheduleSongs(schSongs);
         else setScheduleSongs([]);
+        if (recurrings) setRecurringEvents(recurrings);
 
         if (profile.role === 'leader') {
           const { data: myMins } = await supabase
@@ -1668,32 +1686,191 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
     setLoading(false);
   };
 
+  const syncRecurringEvents = async (cid: string) => {
+    try {
+      const { data: templates } = await supabase
+        .from('recurring_events')
+        .select('*')
+        .eq('church_id', cid);
+
+      if (!templates) return;
+
+      const sixMonthsFromNow = new Date();
+      sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+      
+      const { data: existingEvents } = await supabase
+        .from('events')
+        .select('*')
+        .eq('church_id', cid)
+        .not('recurring_event_id', 'is', null)
+        .gte('date', new Date().toISOString())
+        .lte('date', sixMonthsFromNow.toISOString());
+
+      const existingEventsList = existingEvents || [];
+      const expectedEvents: {
+        recurring_event_id: string;
+        title: string;
+        description: string;
+        date: Date;
+      }[] = [];
+
+      const today = new Date();
+      for (let d = new Date(today); d <= sixMonthsFromNow; d.setDate(d.getDate() + 1)) {
+        const dayOfWeek = d.getDay();
+        const weekOfMonth = Math.ceil(d.getDate() / 7);
+
+        const matchingTemplates = templates.filter(t => {
+          if (t.day_of_week !== dayOfWeek) return false;
+          if (t.pattern_type === 'weekly') return true;
+          if (t.pattern_type === 'monthly_nth_day') {
+            return t.week_of_month === weekOfMonth;
+          }
+          return false;
+        });
+
+        if (matchingTemplates.length === 0) continue;
+
+        // Precedence: monthly overrides weekly
+        const monthlyTemplates = matchingTemplates.filter(t => t.pattern_type === 'monthly_nth_day');
+        const finalTemplates = monthlyTemplates.length > 0 ? monthlyTemplates : matchingTemplates;
+
+        finalTemplates.forEach(t => {
+          const [hours, minutes] = t.time.split(':').map(Number);
+          const occurrenceDate = new Date(d);
+          occurrenceDate.setHours(hours, minutes, 0, 0);
+
+          expectedEvents.push({
+            recurring_event_id: t.id,
+            title: t.title,
+            description: t.description || '',
+            date: occurrenceDate
+          });
+        });
+      }
+
+      const toInsert: any[] = [];
+      const toKeepIds = new Set<string>();
+
+      expectedEvents.forEach(expected => {
+        const match = existingEventsList.find(existing => {
+          const expectedTime = expected.date.getTime();
+          const existingTime = new Date(existing.date).getTime();
+          return existing.recurring_event_id === expected.recurring_event_id && Math.abs(expectedTime - existingTime) < 60000;
+        });
+
+        if (match) {
+          toKeepIds.add(match.id);
+          if (match.title !== expected.title || match.description !== expected.description) {
+            supabase.from('events').update({
+              title: expected.title,
+              description: expected.description
+            }).eq('id', match.id).then();
+          }
+        } else {
+          toInsert.push({
+            church_id: cid,
+            recurring_event_id: expected.recurring_event_id,
+            title: expected.title,
+            description: expected.description,
+            date: expected.date.toISOString()
+          });
+        }
+      });
+
+      const toDelete = existingEventsList.filter(existing => !toKeepIds.has(existing.id));
+
+      if (toDelete.length > 0) {
+        const deleteIds = toDelete.map(d => d.id);
+        await supabase.from('events').delete().in('id', deleteIds);
+      }
+
+      if (toInsert.length > 0) {
+        await supabase.from('events').insert(toInsert);
+      }
+    } catch (error) {
+      console.error('Error syncing recurring events:', error);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (!window.confirm('Excluir este evento recorrente? Todos os eventos futuros baseados nele serão excluídos.')) return;
+    const { error } = await supabase.from('recurring_events').delete().eq('id', templateId);
+    if (!error) {
+      await syncRecurringEvents(churchId);
+      fetchData();
+    } else {
+      alert('Erro ao excluir recorrência.');
+    }
+  };
+
+  const handleEditTemplate = (template: any) => {
+    setEditingTemplateId(template.id);
+    setEventTitle(template.title);
+    setEventDescription(template.description || '');
+    setEventRecurrenceType('recurring');
+    setRecurrencePattern(template.pattern_type);
+    setRecurrenceDayOfWeek(template.day_of_week);
+    setRecurrenceWeekOfMonth(template.week_of_month || 1);
+    setRecurrenceTime(template.time.slice(0, 5)); // HH:MM
+    
+    // Open Event Creation Modal but modified for edit mode
+    setIsRecurringModalOpen(false);
+    setIsEventModalOpen(true);
+  };
+
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventTitle || !eventDate) return;
+    if (!eventTitle) return;
     setIsSubmittingEvent(true);
     
     try {
-      const { error } = await supabase.from('events').insert({
-        church_id: churchId,
-        title: eventTitle,
-        date: eventDate,
-        description: eventDescription
-      });
-      
-      if (error) {
-        console.error('Erro ao criar evento:', error);
-        alert('Erro ao criar evento: ' + error.message);
+      if (eventRecurrenceType === 'single') {
+        if (!eventDate) return;
+        const { error } = await supabase.from('events').insert({
+          church_id: churchId,
+          title: eventTitle,
+          date: eventDate,
+          description: eventDescription
+        });
+        if (error) throw error;
       } else {
-        setIsEventModalOpen(false);
-        setEventTitle('');
-        setEventDate('');
-        setEventDescription('');
-        await fetchData();
+        // Recurring event template
+        const payload = {
+          church_id: churchId,
+          title: eventTitle,
+          description: eventDescription,
+          pattern_type: recurrencePattern,
+          day_of_week: recurrenceDayOfWeek,
+          week_of_month: recurrencePattern === 'monthly_nth_day' ? recurrenceWeekOfMonth : null,
+          time: recurrenceTime + ':00'
+        };
+
+        if (editingTemplateId) {
+          const { error } = await supabase.from('recurring_events').update(payload).eq('id', editingTemplateId);
+          if (error) throw error;
+          setEditingTemplateId(null);
+        } else {
+          const { error } = await supabase.from('recurring_events').insert(payload);
+          if (error) throw error;
+        }
+
+        await syncRecurringEvents(churchId);
       }
+
+      setIsEventModalOpen(false);
+      // Clean states
+      setEventTitle('');
+      setEventDate('');
+      setEventDescription('');
+      setEventRecurrenceType('single');
+      setRecurrencePattern('weekly');
+      setRecurrenceDayOfWeek(0);
+      setRecurrenceWeekOfMonth(1);
+      setRecurrenceTime('18:30');
+      fetchData();
     } catch (err: any) {
-      console.error('Erro inesperado:', err);
-      alert('Erro inesperado ao criar evento.');
+      console.error('Erro ao salvar evento:', err);
+      alert('Erro ao salvar evento.');
     } finally {
       setIsSubmittingEvent(false);
     }
@@ -1819,9 +1996,32 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
           <p className="text-slate-gray text-sm">Gerencie os eventos e a escala de cada ministério.</p>
         </div>
         {currentUserRole === 'manager' && (
-          <button onClick={() => setIsEventModalOpen(true)} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
-            <Plus size={18} /> Novo Evento
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button 
+              onClick={() => {
+                setEditingTemplateId(null);
+                setEventTitle('');
+                setEventDescription('');
+                setEventRecurrenceType('single');
+                setIsRecurringModalOpen(true);
+              }} 
+              className="flex items-center gap-2 justify-center py-2.5 px-4 text-xs font-black uppercase tracking-wider text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20 border border-accent-cyan/30 rounded-xl cursor-pointer transition-all"
+            >
+              <RefreshCw size={14} /> Recorrências
+            </button>
+            <button 
+              onClick={() => {
+                setEditingTemplateId(null);
+                setEventTitle('');
+                setEventDescription('');
+                setEventRecurrenceType('single');
+                setIsEventModalOpen(true);
+              }} 
+              className="flex items-center gap-2 justify-center py-2.5 px-4 text-xs font-black uppercase tracking-wider text-navy-950 bg-accent-cyan hover:bg-accent-cyan/80 rounded-xl cursor-pointer transition-all"
+            >
+              <Plus size={14} /> Novo Evento
+            </button>
+          </div>
         )}
       </div>
 
@@ -1853,7 +2053,14 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                     </span>
                   </div>
                   <div>
-                    <h4 className="text-xl font-display font-black text-white">{event.title}</h4>
+                    <h4 className="text-xl font-display font-black text-white flex items-center gap-2">
+                      {event.title}
+                      {event.recurring_event_id && (
+                        <span className="p-1 bg-navy-850 border border-navy-750 text-slate-gray rounded-md" title="Evento Recorrente">
+                          <Repeat size={12} className="text-accent-cyan" />
+                        </span>
+                      )}
+                    </h4>
                     <p className="text-sm text-slate-gray">
                       {new Date(event.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {event.description || 'Sem descrição'}
                     </p>
@@ -1967,27 +2174,231 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="glass-card p-6 md:p-8 w-full max-w-md relative"
             >
-              <h3 className="text-2xl font-display font-black text-white tracking-tighter mb-6 uppercase">Novo Evento</h3>
+              <h3 className="text-2xl font-display font-black text-white tracking-tighter mb-6 uppercase">
+                {editingTemplateId ? 'Editar Recorrência' : 'Novo Evento'}
+              </h3>
               <form onSubmit={handleCreateEvent} className="space-y-4">
+                {!editingTemplateId && (
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Tipo de Evento</label>
+                    <div className="grid grid-cols-2 gap-2 bg-navy-950/60 p-1.5 rounded-xl border border-navy-800">
+                      <button
+                        type="button"
+                        onClick={() => setEventRecurrenceType('single')}
+                        className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          eventRecurrenceType === 'single'
+                            ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/35'
+                            : 'text-slate-gray hover:text-white border border-transparent'
+                        }`}
+                      >
+                        Único
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEventRecurrenceType('recurring')}
+                        className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          eventRecurrenceType === 'recurring'
+                            ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/35'
+                            : 'text-slate-gray hover:text-white border border-transparent'
+                        }`}
+                      >
+                        Recorrente
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Título</label>
                   <input type="text" required value={eventTitle} onChange={e => setEventTitle(e.target.value)} placeholder="Ex: Culto de Celebração" className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm" />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Data e Hora</label>
-                  <input type="datetime-local" required value={eventDate} onChange={e => setEventDate(e.target.value)} className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm [color-scheme:dark]" />
-                </div>
+
+                {eventRecurrenceType === 'single' ? (
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Data e Hora</label>
+                    <input type="datetime-local" required value={eventDate} onChange={e => setEventDate(e.target.value)} className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm [color-scheme:dark]" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Frequência</label>
+                        <select
+                          value={recurrencePattern}
+                          onChange={e => setRecurrencePattern(e.target.value as any)}
+                          className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm [color-scheme:dark]"
+                        >
+                          <option value="weekly">Semanal</option>
+                          <option value="monthly_nth_day">Mensal (N-ésimo dia)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Hora</label>
+                        <input
+                          type="time"
+                          required
+                          value={recurrenceTime}
+                          onChange={e => setRecurrenceTime(e.target.value)}
+                          className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm [color-scheme:dark]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Dia da Semana</label>
+                        <select
+                          value={recurrenceDayOfWeek}
+                          onChange={e => setRecurrenceDayOfWeek(Number(e.target.value))}
+                          className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm [color-scheme:dark]"
+                        >
+                          <option value={0}>Domingo</option>
+                          <option value={1}>Segunda-feira</option>
+                          <option value={2}>Terça-feira</option>
+                          <option value={3}>Quarta-feira</option>
+                          <option value={4}>Quinta-feira</option>
+                          <option value={5}>Sexta-feira</option>
+                          <option value={6}>Sábado</option>
+                        </select>
+                      </div>
+
+                      {recurrencePattern === 'monthly_nth_day' && (
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Qual Semana do Mês?</label>
+                          <select
+                            value={recurrenceWeekOfMonth}
+                            onChange={e => setRecurrenceWeekOfMonth(Number(e.target.value))}
+                            className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm [color-scheme:dark]"
+                          >
+                            <option value={1}>1ª Semana (Primeiro)</option>
+                            <option value={2}>2ª Semana (Segundo)</option>
+                            <option value={3}>3ª Semana (Terceiro)</option>
+                            <option value={4}>4ª Semana (Quarto)</option>
+                            <option value={5}>5ª Semana (Último)</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Descrição (Opcional)</label>
                   <textarea value={eventDescription} onChange={e => setEventDescription(e.target.value)} rows={2} className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white focus:outline-none focus:border-accent-cyan transition-all text-sm resize-none" />
                 </div>
+
                 <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setIsEventModalOpen(false)} className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-gray hover:text-white transition-colors">Cancelar</button>
-                  <button type="submit" disabled={isSubmittingEvent} className="flex-1 btn-primary text-sm">
-                    {isSubmittingEvent ? 'Criando...' : 'Criar Evento'}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEventModalOpen(false);
+                      setEditingTemplateId(null);
+                    }}
+                    className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-gray hover:text-white transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={isSubmittingEvent} className="flex-1 btn-primary text-sm cursor-pointer">
+                    {isSubmittingEvent ? 'Salvando...' : editingTemplateId ? 'Salvar Alterações' : 'Criar Evento'}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Gerenciar Recorrências */}
+      <AnimatePresence>
+        {isRecurringModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card p-6 md:p-8 w-full max-w-lg relative max-h-[85vh] flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-display font-black text-white tracking-tighter uppercase">Eventos Recorrentes</h3>
+                <button 
+                  onClick={() => setIsRecurringModalOpen(false)}
+                  className="p-1.5 bg-navy-800 text-slate-gray rounded-lg hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar space-y-4 mb-6">
+                {recurringEvents.length === 0 ? (
+                  <div className="p-8 text-center bg-navy-900/50 rounded-2xl border border-dashed border-navy-800">
+                    <p className="text-sm text-slate-gray">Nenhum evento recorrente cadastrado.</p>
+                  </div>
+                ) : (
+                  recurringEvents.map(template => {
+                    const daysOfWeek = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+                    const dayName = daysOfWeek[template.day_of_week];
+                    const timeStr = template.time.slice(0, 5);
+                    const recurrenceText = template.pattern_type === 'weekly'
+                      ? `Toda semana, no(a) ${dayName} às ${timeStr}`
+                      : `No(a) ${['primeiro(a)', 'segundo(a)', 'terceiro(a)', 'quarto(a)', 'último(a)'][template.week_of_month - 1]} ${dayName} de cada mês às ${timeStr}`;
+
+                    return (
+                      <div key={template.id} className="p-4 rounded-xl bg-navy-900 border border-navy-800 flex justify-between items-center gap-4 hover:border-navy-700 transition-all">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-white uppercase tracking-tight truncate">{template.title}</h4>
+                          <p className="text-xs text-accent-cyan font-black uppercase tracking-wider mt-1">{recurrenceText}</p>
+                          {template.description && (
+                            <p className="text-xs text-slate-gray mt-1 line-clamp-1">{template.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleEditTemplate(template)}
+                            className="p-2 bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan hover:text-navy-950 rounded-lg transition-all cursor-pointer"
+                            title="Editar Recorrência"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTemplate(template.id)}
+                            className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all cursor-pointer"
+                            title="Excluir Recorrência"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-auto">
+                <button
+                  onClick={() => setIsRecurringModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-gray hover:text-white border border-navy-800 hover:bg-navy-900/45 transition-colors cursor-pointer"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTemplateId(null);
+                    setEventTitle('');
+                    setEventDescription('');
+                    setEventRecurrenceType('recurring');
+                    setRecurrencePattern('weekly');
+                    setRecurrenceDayOfWeek(0);
+                    setRecurrenceWeekOfMonth(1);
+                    setRecurrenceTime('18:30');
+                    setIsRecurringModalOpen(false);
+                    setIsEventModalOpen(true);
+                  }}
+                  className="flex-1 btn-primary text-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Plus size={14} /> Nova Recorrência
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
