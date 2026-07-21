@@ -193,17 +193,13 @@ export function VolunteerApp() {
       }
 
       // Calculate if Worship Member
-      const keywords = ['louvor', 'musica', 'música', 'worship', 'som', 'mídia', 'midia', 'worsip', 'louvor/musica'];
+      const keywords = ['louvor', 'musica', 'música', 'worship', 'som', 'mídia', 'midia', 'worsip', 'louvor/musica', 'comunicação', 'comunicacao'];
       
       const hasWorshipMin = userMinistriesList.some((m: any) => 
         keywords.some(k => m.name?.toLowerCase().includes(k))
       );
-      
-      const hasWorshipSched = (data || []).some((s: any) => 
-        keywords.some(k => s.schedule?.ministry?.name?.toLowerCase().includes(k))
-      );
 
-      const isWorship = !!(hasWorshipMin || hasWorshipSched);
+      const isWorship = !!hasWorshipMin;
       setIsWorshipMember(isWorship);
 
       // Fetch Songs Repertoire if Louvor or Manager
@@ -593,8 +589,8 @@ export function VolunteerApp() {
                         </div>
                       </div>
 
-                      {/* Ações de Setlist (Visíveis para Louvor sempre que escalado) */}
-                      {(mName.includes('louvor') || mName.includes('música') || mName.includes('musica') || mName.includes('worship') || mName.includes('mídia') || mName.includes('midia') || mName.includes('som')) && (
+                      {/* Ações de Setlist (Visíveis para Louvor e Mídia se tiver permissão) */}
+                      {canManageRepertoire && (mName.includes('louvor') || mName.includes('música') || mName.includes('musica') || mName.includes('worship') || mName.includes('mídia') || mName.includes('midia') || mName.includes('som')) && (
                         <div className="mb-4 flex gap-3">
                           {item.shared_setlist?.length > 0 && (
                             <button 
@@ -673,7 +669,7 @@ export function VolunteerApp() {
               </motion.div>
             )}
 
-            {currentView === 'songs' && (
+            {currentView === 'songs' && canManageRepertoire && (
               <motion.div 
                 key="songs"
                 initial={{ opacity: 0, x: 20 }}

@@ -106,11 +106,12 @@ export function AdminDashboard() {
     }
   };
 
-  const isWorshipLeader = useMemo(() => {
-    return leadMinistries.some(name => name.includes('louvor') || name.includes('música') || name.includes('worship'));
+  const isWorshipOrMediaLeader = useMemo(() => {
+    const keywords = ['louvor', 'musica', 'música', 'worship', 'som', 'mídia', 'midia', 'comunicação', 'comunicacao'];
+    return leadMinistries.some(name => keywords.some(k => name.includes(k)));
   }, [leadMinistries]);
 
-  const canSeeSongs = userRole === 'manager' || isWorshipLeader;
+  const canSeeSongs = userRole === 'manager' || isWorshipOrMediaLeader;
 
   const pendingConfirms = useMemo(() => schedules.filter(s => s.status === 'pending').length, [schedules]);
 
@@ -242,10 +243,10 @@ export function AdminDashboard() {
               transition={{ duration: 0.3, ease: "circOut" }}
             >
               {currentView === 'dashboard' && <DashboardView />}
-              {currentView === 'schedule' && <ScheduleView />}
+              {currentView === 'schedule' && <ScheduleView canSeeSongs={canSeeSongs} />}
               {currentView === 'volunteers' && <VolunteersView />}
               {currentView === 'ministries' && <MinistriesView />}
-              {currentView === 'songs' && <SongsView />}
+              {currentView === 'songs' && canSeeSongs && <SongsView />}
               {currentView === 'profile' && (
                 <ProfileView 
                   userId={currentUserId} 
@@ -1511,7 +1512,7 @@ function MinistriesView() {
   );
 }
 
-function ScheduleView() {
+function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [events, setEvents] = useState<any[]>([]);
   const [ministries, setMinistries] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -1865,7 +1866,7 @@ function ScheduleView() {
                         </div>
 
                         {/* Setlist Summary */}
-                        {schedule && scheduleSongs && scheduleSongs.filter(ss => ss.schedule_id === schedule.id).length > 0 && (
+                        {canSeeSongs && schedule && scheduleSongs && scheduleSongs.filter(ss => ss.schedule_id === schedule.id).length > 0 && (
                           <div className="mt-4 pt-3 border-t border-navy-800/50">
                             <div className="flex items-center gap-1.5 mb-2">
                               <Music size={10} className="text-accent-cyan" />
@@ -1995,59 +1996,61 @@ function ScheduleView() {
                 )}
 
                 {/* Gestão de Setlist (Músicas) */}
-                <div className="pt-6 border-t border-navy-800">
-                  <p className="text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                    <Music size={12} className="text-accent-cyan" /> Setlist de Músicas
-                  </p>
-                  
-                  <div className="mb-4">
-                    <select 
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addSongToSetlist(e.target.value);
-                          e.target.value = '';
+                {canSeeSongs && (
+                  <div className="pt-6 border-t border-navy-800">
+                    <p className="text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                      <Music size={12} className="text-accent-cyan" /> Setlist de Músicas
+                    </p>
+                    
+                    <div className="mb-4">
+                      <select 
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            addSongToSetlist(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="w-full bg-navy-950 border border-navy-700 text-white text-sm rounded-xl px-4 py-2.5 focus:border-accent-cyan transition-colors outline-none"
+                      >
+                        <option value="">Adicionar música ao setlist...</option>
+                        {allSongs
+                          .filter(s => !selectedSongsForSchedule.find(ss => ss.id === s.id))
+                          .map(s => (
+                            <option key={s.id} value={s.id}>{s.title} - {s.artist}</option>
+                          ))
                         }
-                      }}
-                      className="w-full bg-navy-950 border border-navy-700 text-white text-sm rounded-xl px-4 py-2.5 focus:border-accent-cyan transition-colors outline-none"
-                    >
-                      <option value="">Adicionar música ao setlist...</option>
-                      {allSongs
-                        .filter(s => !selectedSongsForSchedule.find(ss => ss.id === s.id))
-                        .map(s => (
-                          <option key={s.id} value={s.id}>{s.title} - {s.artist}</option>
-                        ))
-                      }
-                    </select>
-                  </div>
+                      </select>
+                    </div>
 
-                  {selectedSongsForSchedule.length === 0 ? (
-                    <div className="p-4 text-center bg-navy-900/30 rounded-xl border border-dashed border-navy-800">
-                      <p className="text-[10px] text-slate-600">Nenhuma música no setlist.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {selectedSongsForSchedule.map((song, index) => (
-                        <div key={song.id} className="flex items-center justify-between p-3 bg-navy-800/50 rounded-xl border border-navy-700 group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-md bg-navy-700 flex items-center justify-center text-[10px] font-bold text-accent-cyan">
-                              {index + 1}
+                    {selectedSongsForSchedule.length === 0 ? (
+                      <div className="p-4 text-center bg-navy-900/30 rounded-xl border border-dashed border-navy-800">
+                        <p className="text-[10px] text-slate-600">Nenhuma música no setlist.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedSongsForSchedule.map((song, index) => (
+                          <div key={song.id} className="flex items-center justify-between p-3 bg-navy-800/50 rounded-xl border border-navy-700 group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-6 h-6 rounded-md bg-navy-700 flex items-center justify-center text-[10px] font-bold text-accent-cyan">
+                                {index + 1}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-white">{song.title}</p>
+                                <p className="text-[10px] text-slate-gray">{song.artist} • {song.key}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-xs font-bold text-white">{song.title}</p>
-                              <p className="text-[10px] text-slate-gray">{song.artist} • {song.key}</p>
-                            </div>
+                            <button 
+                              onClick={() => removeSongFromSetlist(song.id)}
+                              className="p-1.5 text-slate-gray hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
-                          <button 
-                            onClick={() => removeSongFromSetlist(song.id)}
-                            className="p-1.5 text-slate-gray hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-6 mt-4 border-t border-navy-800">
