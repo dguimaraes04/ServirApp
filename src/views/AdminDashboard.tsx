@@ -907,6 +907,49 @@ function VolunteersView() {
   );
 }
 
+const PREDEFINED_MINISTRIES = [
+  {
+    name: 'Mídia & Comunicação',
+    description: 'Responsável pela transmissão ao vivo, fotografia, redes sociais, projeção e design visual.',
+    color: '#0EA5E9'
+  },
+  {
+    name: 'Louvor & Adoração',
+    description: 'Equipe de músicos, vocalistas, sonoplastia e direção musical dos cultos.',
+    color: '#A855F7'
+  },
+  {
+    name: 'Ministério Kids',
+    description: 'Cuidado, ensino bíblico infantil, recreação e discipulado de crianças.',
+    color: '#F43F5E'
+  },
+  {
+    name: 'Recepção & Integração',
+    description: 'Acolhimento de membros e visitantes, orientação física e suporte no hall de entrada.',
+    color: '#34D399'
+  },
+  {
+    name: 'Intercessão & Oração',
+    description: 'Equipe dedicada à oração pastoral, intercessão pré/pós culto e aconselhamento de oração.',
+    color: '#FBBF24'
+  },
+  {
+    name: 'Ação Social',
+    description: 'Projetos beneficentes, distribuição de cestas básicas, visitas a asilos/hospitais e caridade.',
+    color: '#64FFDA'
+  },
+  {
+    name: 'Teatro & Artes Cênicas',
+    description: 'Expressão artística, peças teatrais, dança e apresentações artísticas especiais.',
+    color: '#EC4899'
+  },
+  {
+    name: 'Infraestrutura & Apoio',
+    description: 'Logística de cultos, segurança, limpeza, organização e suporte geral do templo.',
+    color: '#64748B'
+  }
+];
+
 function MinistriesView() {
   const [ministries, setMinistries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -918,6 +961,43 @@ function MinistriesView() {
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#64FFDA');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [creationMode, setCreationMode] = useState<'preset' | 'custom'>('preset');
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState<number>(0);
+
+  const openCreateModal = () => {
+    setCreationMode('preset');
+    setSelectedPresetIndex(0);
+    setName(PREDEFINED_MINISTRIES[0].name);
+    setDescription(PREDEFINED_MINISTRIES[0].description);
+    setColor(PREDEFINED_MINISTRIES[0].color);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setName('');
+    setDescription('');
+    setColor('#64FFDA');
+  };
+
+  const handleSelectPreset = (index: number) => {
+    setSelectedPresetIndex(index);
+    setName(PREDEFINED_MINISTRIES[index].name);
+    setDescription(PREDEFINED_MINISTRIES[index].description);
+    setColor(PREDEFINED_MINISTRIES[index].color);
+  };
+
+  const handleModeChange = (mode: 'preset' | 'custom') => {
+    setCreationMode(mode);
+    if (mode === 'preset') {
+      handleSelectPreset(selectedPresetIndex);
+    } else {
+      setName('');
+      setDescription('');
+      setColor('#64FFDA');
+    }
+  };
 
   // Gestão de Membros
   const [managingMinistry, setManagingMinistry] = useState<any>(null);
@@ -1110,10 +1190,7 @@ function MinistriesView() {
     });
 
     if (!error) {
-      setIsModalOpen(false);
-      setName('');
-      setDescription('');
-      setColor('#64FFDA');
+      handleCloseModal();
       fetchMinistries();
     } else {
       console.error(error);
@@ -1130,7 +1207,7 @@ function MinistriesView() {
         </div>
         {currentUserRole === 'manager' && (
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
           >
             <Plus size={18} /> Criar Ministério
@@ -1149,7 +1226,7 @@ function MinistriesView() {
           </div>
           <h3 className="text-xl font-bold text-white mb-2">Nenhum Ministério Encontrado</h3>
           <p className="text-slate-gray mb-6 max-w-sm">Comece criando os ministérios da sua igreja para poder organizar as escalas e os voluntários.</p>
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm px-6 py-2">Criar o Primeiro</button>
+          <button onClick={openCreateModal} className="btn-primary text-sm px-6 py-2">Criar o Primeiro</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -1206,10 +1283,57 @@ function MinistriesView() {
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="glass-card p-6 md:p-8 w-full max-w-md relative overflow-hidden"
             >
-              <h3 className="text-2xl font-display font-black text-white tracking-tighter mb-6">Novo Ministério</h3>
+              <h3 className="text-2xl font-display font-black text-white tracking-tighter mb-4">Novo Ministério</h3>
+              
+              {/* Seletor de Tipo de Criação */}
+              <div className="flex bg-navy-950/60 p-1 rounded-xl border border-navy-800 mb-5">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('preset')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${creationMode === 'preset' ? 'bg-navy-800 text-accent-cyan shadow-sm font-black' : 'text-slate-gray hover:text-white'}`}
+                >
+                  Predefinidos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('custom')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${creationMode === 'custom' ? 'bg-navy-800 text-accent-cyan shadow-sm font-black' : 'text-slate-gray hover:text-white'}`}
+                >
+                  Personalizado
+                </button>
+              </div>
+
               <form onSubmit={handleCreate} className="space-y-4">
+                {creationMode === 'preset' && (
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Escolha uma opção</label>
+                    <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar mb-2 bg-navy-950/20 p-2 rounded-xl border border-navy-800/50">
+                      {PREDEFINED_MINISTRIES.map((preset, index) => {
+                        const isSelected = selectedPresetIndex === index;
+                        return (
+                          <button
+                            key={preset.name}
+                            type="button"
+                            onClick={() => handleSelectPreset(index)}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-navy-800 border-accent-cyan shadow-[0_0_10px_rgba(100,255,218,0.15)]'
+                                : 'bg-navy-950/40 border-navy-800 hover:border-navy-700'
+                            }`}
+                          >
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: preset.color }} />
+                            <span className="text-[11px] font-bold text-white truncate">{preset.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Nome</label>
+                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">
+                    {creationMode === 'preset' ? 'Nome (Edite se desejar)' : 'Nome'}
+                  </label>
                   <input type="text" required value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Mídia e Tech" className="block w-full px-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-sm" />
                 </div>
                 <div>
@@ -1222,15 +1346,15 @@ function MinistriesView() {
                     {PRESET_COLORS.map(c => (
                       <button 
                         key={c} type="button" onClick={() => setColor(c)}
-                        className={`w-8 h-8 rounded-full border-2 transition-all ${color === c ? 'border-white scale-110 shadow-[0_0_15px_currentColor]' : 'border-transparent hover:scale-110'}`}
+                        className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${color === c ? 'border-white scale-110 shadow-[0_0_15px_currentColor]' : 'border-transparent hover:scale-110'}`}
                         style={{ backgroundColor: c, color: c }}
                       />
                     ))}
                   </div>
                 </div>
                 <div className="flex gap-3 pt-6">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-gray hover:text-white hover:bg-navy-800 transition-colors">Cancelar</button>
-                  <button type="submit" disabled={isSubmitting} className="flex-1 btn-primary text-sm">
+                  <button type="button" onClick={handleCloseModal} className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-gray hover:text-white hover:bg-navy-800 transition-colors cursor-pointer">Cancelar</button>
+                  <button type="submit" disabled={isSubmitting} className="flex-1 btn-primary text-sm cursor-pointer">
                     {isSubmitting ? 'Salvando...' : 'Criar Ministério'}
                   </button>
                 </div>
