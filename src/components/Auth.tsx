@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, Zap, Building, Key, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../contexts/ThemeContext';
 
 type AuthMode = 'login' | 'register_church' | 'register_volunteer';
 
 export function Auth() {
+  const { theme } = useTheme();
   const [mode, setMode] = useState<AuthMode>('login');
   
   // Form fields
@@ -123,11 +125,17 @@ export function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-navy-950 flex relative overflow-hidden">
+    <div className="min-h-screen flex relative overflow-hidden transition-colors duration-300" style={{ background: 'var(--bg-base)' }}>
       {/* Background Graphics */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent-cyan/10 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px]" />
+        <div 
+          className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] transition-all" 
+          style={{ background: 'var(--accent)', opacity: theme === 'dark' ? 0.08 : 0.05 }}
+        />
+        <div 
+          className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] transition-all" 
+          style={{ background: '#3B82F6', opacity: theme === 'dark' ? 0.08 : 0.05 }}
+        />
       </div>
 
       <div className="flex-1 flex flex-col justify-center items-center px-4 py-8 z-10 w-full">
@@ -140,17 +148,29 @@ export function Auth() {
           {/* Logo */}
           <div className="flex flex-col items-center mb-6">
             <div className="h-12 flex items-center justify-center my-4">
-              <img src="/church_logo_dark.svg" alt="Church+" className="h-10 w-auto object-contain" />
+              <img 
+                src={theme === 'dark' ? '/church_logo_dark.svg' : '/church_logo_light.svg'} 
+                alt="Church+" 
+                className="h-10 w-auto object-contain" 
+              />
             </div>
-            <p className="text-slate-gray text-center font-medium text-sm md:text-base mb-4">Gestão inteligente para o corpo de Cristo.</p>
+            <p className="text-center font-medium text-sm md:text-base mb-4" style={{ color: 'var(--text-secondary)' }}>
+              Gestão inteligente para o corpo de Cristo.
+            </p>
           </div>
 
-          <div className="glass-card p-6 md:p-8 rounded-3xl border border-navy-800 bg-navy-900/60 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent-cyan to-transparent opacity-50" />
+          <div 
+            className="glass-card p-6 md:p-8 rounded-3xl shadow-2xl relative overflow-hidden"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)' }}
+          >
+            <div 
+              className="absolute top-0 left-0 w-full h-1 opacity-50" 
+              style={{ background: 'linear-gradient(to right, transparent, var(--accent), transparent)' }}
+            />
             
             {/* Header Text */}
             <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-white mb-1">
+              <h2 className="text-xl font-black mb-1" style={{ color: 'var(--text-heading)' }}>
                 {mode === 'login' && 'Bem-vindo de volta'}
                 {mode === 'register_church' && 'Cadastre sua Igreja'}
                 {mode === 'register_volunteer' && 'Junte-se à sua Igreja'}
@@ -162,17 +182,20 @@ export function Auth() {
               {/* Nome Completo (Only Registration) */}
               {(mode === 'register_church' || mode === 'register_volunteer') && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Nome Completo</label>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Nome Completo
+                  </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-slate-gray group-focus-within:text-accent-cyan transition-colors" />
+                      <User className="h-5 w-5 transition-colors" style={{ color: 'var(--text-secondary)' }} />
                     </div>
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="block w-full pl-11 pr-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-sm"
+                      className="block w-full pl-11 pr-4 py-3 rounded-xl transition-all text-sm outline-none"
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                       placeholder="João da Silva"
                     />
                   </div>
@@ -182,17 +205,20 @@ export function Auth() {
               {/* Nome da Igreja (Only Church Reg) */}
               {mode === 'register_church' && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Nome da Igreja</label>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Nome da Igreja
+                  </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Building className="h-5 w-5 text-slate-gray group-focus-within:text-accent-cyan transition-colors" />
+                      <Building className="h-5 w-5 transition-colors" style={{ color: 'var(--text-secondary)' }} />
                     </div>
                     <input
                       type="text"
                       required
                       value={churchName}
                       onChange={(e) => setChurchName(e.target.value)}
-                      className="block w-full pl-11 pr-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-sm"
+                      className="block w-full pl-11 pr-4 py-3 rounded-xl transition-all text-sm outline-none"
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                       placeholder="Igreja Batista Central"
                     />
                   </div>
@@ -202,17 +228,20 @@ export function Auth() {
               {/* Código de Convite (Only Volunteer Reg) */}
               {mode === 'register_volunteer' && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">Código de Convite</label>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Código de Convite
+                  </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Key className="h-5 w-5 text-slate-gray group-focus-within:text-accent-cyan transition-colors" />
+                      <Key className="h-5 w-5 transition-colors" style={{ color: 'var(--text-secondary)' }} />
                     </div>
                     <input
                       type="text"
                       required
                       value={inviteCode}
                       onChange={(e) => setInviteCode(e.target.value)}
-                      className="block w-full pl-11 pr-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-sm uppercase"
+                      className="block w-full pl-11 pr-4 py-3 rounded-xl transition-all text-sm uppercase outline-none"
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                       placeholder="Ex: ABX92K"
                     />
                   </div>
@@ -221,17 +250,20 @@ export function Auth() {
 
               {/* Email (Always) */}
               <div>
-                <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] mb-2 ml-1">E-mail</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                  E-mail
+                </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-slate-gray group-focus-within:text-accent-cyan transition-colors" />
+                    <Mail className="h-5 w-5 transition-colors" style={{ color: 'var(--text-secondary)' }} />
                   </div>
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-sm"
+                    className="block w-full pl-11 pr-4 py-3 rounded-xl transition-all text-sm outline-none"
+                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                     placeholder="seu@email.com"
                   />
                 </div>
@@ -240,19 +272,26 @@ export function Auth() {
               {/* Senha (Always) */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block text-[10px] font-black text-slate-gray uppercase tracking-[0.2em] ml-1">Senha</label>
-                  {mode === 'login' && <a href="#" className="text-[10px] text-accent-cyan font-bold hover:underline">Esqueceu?</a>}
+                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Senha
+                  </label>
+                  {mode === 'login' && (
+                    <a href="#" className="text-[10px] font-black hover:underline" style={{ color: 'var(--accent)' }}>
+                      Esqueceu?
+                    </a>
+                  )}
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-slate-gray group-focus-within:text-accent-cyan transition-colors" />
+                    <Lock className="h-5 w-5 transition-colors" style={{ color: 'var(--text-secondary)' }} />
                   </div>
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-3 bg-navy-950/50 border border-navy-800 rounded-xl text-white placeholder-slate-gray/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-navy-950 transition-all text-sm"
+                    className="block w-full pl-11 pr-4 py-3 rounded-xl transition-all text-sm outline-none"
+                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                     placeholder="••••••••"
                   />
                 </div>
@@ -289,12 +328,13 @@ export function Auth() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full relative group overflow-hidden rounded-xl bg-accent-cyan text-navy-950 font-bold text-sm py-4 mt-2 transition-all hover:shadow-[0_0_20px_rgba(100,255,218,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full relative group overflow-hidden rounded-xl font-bold text-sm py-4 mt-2 transition-all cursor-pointer"
+                style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
               >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                <div className="absolute inset-0 bg-white/25 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                 <span className="relative flex items-center justify-center gap-2">
                   {loading ? (
-                    <div className="w-5 h-5 border-2 border-navy-950/30 border-t-navy-950 rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent-text)', borderTopColor: 'transparent' }} />
                   ) : (
                     <>
                       {mode === 'login' && 'Entrar no Sistema'}
@@ -308,26 +348,26 @@ export function Auth() {
             </form>
 
             {/* Alternância de Modos */}
-            <div className="mt-8 pt-6 border-t border-navy-800/50 flex flex-col gap-3">
+            <div className="mt-8 pt-6 flex flex-col gap-3" style={{ borderTop: '1px solid var(--border-main)' }}>
               {mode !== 'login' && (
-                <button onClick={() => changeMode('login')} className="text-xs text-slate-gray hover:text-white transition-colors">
-                  Já tem uma conta? <span className="text-accent-cyan font-bold">Faça login</span>
+                <button onClick={() => changeMode('login')} className="text-xs transition-colors cursor-pointer text-left" style={{ color: 'var(--text-secondary)' }}>
+                  Já tem uma conta? <span className="font-bold" style={{ color: 'var(--accent)' }}>Faça login</span>
                 </button>
               )}
               {mode !== 'register_church' && (
-                <button onClick={() => changeMode('register_church')} className="text-xs text-slate-gray hover:text-white transition-colors">
-                  É Pastor ou Gestor? <span className="text-accent-cyan font-bold">Cadastre sua Igreja</span>
+                <button onClick={() => changeMode('register_church')} className="text-xs transition-colors cursor-pointer text-left" style={{ color: 'var(--text-secondary)' }}>
+                  É Pastor ou Gestor? <span className="font-bold" style={{ color: 'var(--accent)' }}>Cadastre sua Igreja</span>
                 </button>
               )}
               {mode !== 'register_volunteer' && (
-                <button onClick={() => changeMode('register_volunteer')} className="text-xs text-slate-gray hover:text-white transition-colors">
-                  É Voluntário ou Líder? <span className="text-accent-cyan font-bold">Use um código de convite</span>
+                <button onClick={() => changeMode('register_volunteer')} className="text-xs transition-colors cursor-pointer text-left" style={{ color: 'var(--text-secondary)' }}>
+                  É Voluntário ou Líder? <span className="font-bold" style={{ color: 'var(--accent)' }}>Use um código de convite</span>
                 </button>
               )}
             </div>
           </div>
           
-          <p className="text-center text-xs text-slate-gray/60 mt-8 font-medium">
+          <p className="text-center text-xs mt-8 font-medium" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>
             © {new Date().getFullYear()} Church+. Todos os direitos reservados.
           </p>
         </motion.div>
