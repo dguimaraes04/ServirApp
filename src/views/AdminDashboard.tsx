@@ -1538,6 +1538,13 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [selectedMinistry, setSelectedMinistry] = useState<any>(null);
   const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
   const [selectedVolsForSchedule, setSelectedVolsForSchedule] = useState<{volunteer_id: string, role_function: string}[]>([]);
+
+  const louvorMin = useMemo(() => {
+    return ministries.find(m => {
+      const name = m.name.toLowerCase();
+      return name.includes('louvor') || name.includes('música') || name.includes('musica') || name.includes('worship');
+    });
+  }, [ministries]);
   const [allSongs, setAllSongs] = useState<any[]>([]);
   const [selectedSongsForSchedule, setSelectedSongsForSchedule] = useState<any[]>([]);
   const [scheduleSongs, setScheduleSongs] = useState<any[]>([]);
@@ -1646,7 +1653,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
         .from('schedule_songs')
         .select('*, songs(*)')
         .eq('schedule_id', schedule.id)
-        .order('order');
+        .order('order_index');
       if (songs) {
         setSelectedSongsForSchedule(songs.map(ss => ss.songs));
       } else {
@@ -1790,24 +1797,37 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                     </p>
                   </div>
                 </div>
-                {currentUserRole === 'manager' && (
-                  <button 
-                    onClick={() => {
-                      if (window.confirm(`Excluir o evento "${event.title}"? Isso removerá todas as escalas vinculadas.`)) {
-                        supabase.from('events').delete().eq('id', event.id).then(() => fetchData());
-                      }
-                    }}
-                    className="p-2.5 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
-                    title="Excluir Evento"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                )}
+                <div className="flex items-center gap-3 self-stretch md:self-auto justify-end">
+                  {canSeeSongs && louvorMin && (
+                    <button
+                      onClick={() => openScheduleModal(event, louvorMin)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-accent-cyan/10 hover:bg-accent-cyan/20 border border-accent-cyan/30 text-accent-cyan rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      <Music size={14} /> Setlist do Dia
+                    </button>
+                  )}
+                  {currentUserRole === 'manager' && (
+                    <button 
+                      onClick={() => {
+                        if (window.confirm(`Excluir o evento "${event.title}"? Isso removerá todas as escalas vinculadas.`)) {
+                          supabase.from('events').delete().eq('id', event.id).then(() => fetchData());
+                        }
+                      }}
+                      className="p-2.5 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 hover:text-white transition-all border border-red-500/20 cursor-pointer"
+                      title="Excluir Evento"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
               
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {ministries.map(min => {
+                    const isMusicOrMedia = ['louvor', 'musica', 'música', 'worship', 'som', 'mídia', 'midia', 'comunicação', 'comunicacao'].some(k => min.name.toLowerCase().includes(k));
+                    if (isMusicOrMedia && !canSeeSongs) return null;
+
                     const schedule = schedules.find(s => s.event_id === event.id && s.ministry_id === min.id);
                     const volsInMin = scheduleVolunteers.filter(sv => sv.schedule_id === schedule?.id);
                     const canEdit = currentUserRole === 'manager' || leadMinistriesIds.includes(min.id);
@@ -1822,7 +1842,7 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                           {canEdit ? (
                             <button 
                               onClick={() => openScheduleModal(event, min)}
-                              className="text-[10px] font-black uppercase text-accent-cyan hover:text-white transition-colors"
+                              className="text-[10px] font-black uppercase text-accent-cyan hover:text-white transition-colors cursor-pointer"
                             >
                               {schedule ? 'Editar' : 'Montar'}
                             </button>
@@ -1864,26 +1884,6 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
                             <p className="text-[11px] text-slate-600 italic">Ninguém escalado</p>
                           )}
                         </div>
-
-                        {/* Setlist Summary */}
-                        {canSeeSongs && schedule && scheduleSongs && scheduleSongs.filter(ss => ss.schedule_id === schedule.id).length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-navy-800/50">
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <Music size={10} className="text-accent-cyan" />
-                              <span className="text-[9px] font-black text-slate-gray uppercase tracking-widest">Setlist</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {scheduleSongs && scheduleSongs
-                                .filter(ss => ss.schedule_id === schedule.id)
-                                .map(ss => (
-                                  <span key={ss.id} className="text-[9px] px-2 py-0.5 rounded bg-navy-800 text-slate-300 border border-navy-700">
-                                    {ss.songs.title}
-                                  </span>
-                                ))
-                              }
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
