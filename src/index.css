@@ -28,17 +28,17 @@
   --font-display: "Urbanist", sans-serif;
 }
 
-/* ─── DARK THEME (existing) ─────────────────────────────── */
+/* ─── DARK THEME ────────────────────────────────────────── */
 html.dark {
   --bg-base:        #0A192F;
   --bg-surface:     #112240;
-  --bg-elevated:    rgba(17,34,64,0.4);
+  --bg-elevated:    rgba(17,34,64,0.7);
   --bg-input:       #050C16;
   --border-main:    #1D2D50;
   --border-subtle:  #112240;
   --text-primary:   #CCD6F6;
   --text-secondary: #8892B0;
-  --text-heading:   #ffffff;
+  --text-heading:   #FFFFFF;
   --accent:         #64FFDA;
   --accent-subtle:  rgba(100,255,218,0.1);
   --accent-border:  rgba(100,255,218,0.2);
@@ -48,9 +48,10 @@ html.dark {
   --card-shadow:    0 4px 30px rgba(0,0,0,0.5);
   --scrollbar:      #1D2D50;
   --scrollbar-hover:#2D3D60;
+  color-scheme: dark;
 }
 
-/* ─── LIGHT THEME (new default) ────────────────────────── */
+/* ─── LIGHT THEME (default) ────────────────────────────── */
 html.light, html:not(.dark) {
   --bg-base:        #F1F5F9;
   --bg-surface:     #FFFFFF;
@@ -63,7 +64,7 @@ html.light, html:not(.dark) {
   --text-secondary: #334155; /* Slate 700 - high contrast label text */
   --text-heading:   #020617; /* Pitch dark navy heading text */
 
-  --accent:         #2563EB; /* Vivid Royal Blue (matching user photo) */
+  --accent:         #2563EB; /* Vivid Royal Blue */
   --accent-subtle:  rgba(37,99,235,0.12);
   --accent-border:  rgba(37,99,235,0.35);
   --accent-text:    #FFFFFF;
@@ -73,9 +74,10 @@ html.light, html:not(.dark) {
   --card-shadow:    0 4px 20px -2px rgba(15, 23, 42, 0.08);
   --scrollbar:      #94A3B8;
   --scrollbar-hover:#64748B;
+  color-scheme: light;
 }
 
-/* ─── LIGHT THEME CONTRAST OVERRIDES FOR LEGACY CLASSES ──── */
+/* ─── LIGHT THEME COMPREHENSIVE OVERRIDES ───────────────── */
 html.light, html:not(.dark) {
   /* Replace faint cyan text with Royal Blue */
   .text-accent-cyan {
@@ -83,30 +85,123 @@ html.light, html:not(.dark) {
   }
 
   /* Replace pale gray text with dark slate */
-  .text-slate-gray {
+  .text-slate-gray,
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600 {
     color: #334155 !important;
   }
 
-  .text-slate-light {
+  .text-slate-light,
+  .text-slate-300,
+  .text-slate-200,
+  .text-slate-100 {
     color: #0F172A !important;
   }
 
-  /* Ensure text-white on light backgrounds renders crisp dark slate */
-  .glass-card .text-white,
-  main .text-white,
-  aside .text-white,
-  header .text-white,
-  section .text-white,
-  p.text-white,
-  h1.text-white,
-  h2.text-white,
-  h3.text-white,
-  h4.text-white,
-  span.text-white {
+  /* Ensure headings & paragraph text render dark slate */
+  h1, h2, h3, h4, h5, h6,
+  .text-white {
     color: #0F172A;
   }
 
-  /* Keep text white inside solid dark/accent elements */
+  /* Dark background overrides: Convert all hardcoded navy/slate boxes to clean white/light slate cards */
+  [class*="bg-navy-"],
+  [class*="bg-slate-8"],
+  [class*="bg-slate-9"] {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+    color: #0F172A !important;
+  }
+
+  /* Inner subtle card boxes inside modals or cards */
+  .bg-navy-950\/40,
+  .bg-navy-950\/50,
+  .bg-navy-950\/60,
+  .bg-navy-950\/80,
+  .bg-navy-900\/40,
+  .bg-navy-900\/50,
+  .bg-navy-900\/60,
+  .bg-navy-800\/40,
+  .bg-navy-800\/50,
+  .bg-navy-800\/60,
+  .bg-navy-800\/80 {
+    background-color: #F8FAFC !important;
+    border-color: #CBD5E1 !important;
+    color: #0F172A !important;
+  }
+
+  /* Form controls (inputs, selects, textareas) */
+  input, select, textarea {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+    color: #0F172A !important;
+    color-scheme: light !important;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: #64748B !important;
+    opacity: 0.9 !important;
+  }
+
+  /* Modal backdrops in light mode */
+  .fixed.inset-0.bg-navy-950\/80,
+  .fixed.inset-0.bg-navy-950\/90 {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+  }
+
+  /* Date Badges & Avatars */
+  .bg-navy-800,
+  .bg-navy-850,
+  .bg-navy-900 {
+    background-color: #F1F5F9 !important;
+    border-color: #CBD5E1 !important;
+    color: #0F172A !important;
+  }
+
+  /* Accent cyan backgrounds for buttons & badges */
+  .bg-accent-cyan {
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
+  }
+
+  .bg-accent-cyan\/10,
+  .bg-accent-cyan\/15,
+  .bg-accent-cyan\/20 {
+    background-color: #DBEAFE !important;
+    color: #1D4ED8 !important;
+    border-color: #93C5FD !important;
+  }
+
+  .bg-accent-cyan\/10 *,
+  .bg-accent-cyan\/15 *,
+  .bg-accent-cyan\/20 * {
+    color: #1D4ED8 !important;
+  }
+
+  /* Red & Yellow & Purple action buttons in light mode */
+  .bg-red-500\/10,
+  .bg-red-500\/20 {
+    background-color: #FEE2E2 !important;
+    color: #DC2626 !important;
+    border-color: #FCA5A5 !important;
+  }
+
+  .bg-yellow-500\/10,
+  .bg-yellow-500\/20 {
+    background-color: #FEF3C7 !important;
+    color: #B45309 !important;
+    border-color: #FDE68A !important;
+  }
+
+  .bg-purple-500\/10,
+  .bg-purple-500\/20 {
+    background-color: #F3E8FF !important;
+    color: #7E22CE !important;
+    border-color: #D8B4FE !important;
+  }
+
+  /* Keep text white ONLY inside solid accent/primary buttons */
   .btn-primary,
   .btn-primary *,
   .bg-accent-cyan,
@@ -118,55 +213,8 @@ html.light, html:not(.dark) {
   .bg-red-500,
   .bg-red-500 *,
   .bg-green-500,
-  .bg-green-500 *,
-  .bg-navy-950,
-  .bg-navy-950 *,
-  .bg-navy-900,
-  .bg-navy-900 *,
-  .bg-navy-800,
-  .bg-navy-800 * {
+  .bg-green-500 * {
     color: #FFFFFF !important;
-  }
-
-  /* Style accent-cyan background elements with Royal Blue in light mode */
-  .bg-accent-cyan {
-    background-color: #2563EB !important;
-    color: #FFFFFF !important;
-  }
-
-  .bg-accent-cyan\/10 {
-    background-color: rgba(37, 99, 235, 0.12) !important;
-  }
-
-  .border-accent-cyan\/20,
-  .border-accent-cyan\/30,
-  .border-accent-cyan\/50 {
-    border-color: rgba(37, 99, 235, 0.35) !important;
-  }
-
-  /* Card and input background overrides */
-  .bg-navy-950\/50,
-  .bg-navy-950\/60,
-  .bg-navy-950\/80 {
-    background-color: #FFFFFF !important;
-    border-color: #CBD5E1 !important;
-  }
-
-  .bg-navy-900\/60,
-  .bg-navy-900\/50,
-  .bg-navy-900 {
-    background-color: #F8FAFC !important;
-    border-color: #E2E8F0 !important;
-  }
-
-  .bg-navy-800 {
-    background-color: #F1F5F9 !important;
-    border-color: #CBD5E1 !important;
-  }
-
-  .border-navy-800,
-  .border-navy-700 {
-    border-color: #CBD5E1 !important;
   }
 }
 
@@ -178,7 +226,7 @@ html.light, html:not(.dark) {
     @apply font-sans antialiased;
   }
 
-  h1, h2, h3, h4 {
+  h1, h2, h3, h4, h5, h6 {
     color: var(--text-heading);
     @apply font-display;
   }
@@ -207,11 +255,12 @@ html.light, html:not(.dark) {
 
 /* ─── GLASS CARD ────────────────────────────────────────── */
 .glass-card {
-  background-color: var(--bg-elevated);
+  background-color: var(--bg-surface);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-main);
   box-shadow: var(--card-shadow);
+  color: var(--text-primary);
   @apply rounded-2xl transition-all duration-300;
 }
 
@@ -280,4 +329,3 @@ html.light, html:not(.dark) {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-hover);
 }
-
