@@ -23,7 +23,8 @@ import {
   Camera,
   ArrowLeft,
   Sun,
-  Moon
+  Moon,
+  Globe
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
@@ -365,6 +366,72 @@ export function VolunteerApp() {
     const updated = [...selectedSongsForSetlist];
     updated[index] = { ...updated[index], custom_key: newKey };
     setSelectedSongsForSetlist(updated);
+  };
+
+  // Volunteer Setlist Repertoire & Online Search States
+  const [volunteerSongSearchTab, setVolunteerSongSearchTab] = useState<'repertoire' | 'online'>('repertoire');
+  const [volunteerRepertoireQuery, setVolunteerRepertoireQuery] = useState('');
+  const [volNewSongTitle, setVolNewSongTitle] = useState('');
+  const [volNewSongArtist, setVolNewSongArtist] = useState('');
+  const [volNewSongKey, setVolNewSongKey] = useState('');
+  const [volNewSongBpm, setVolNewSongBpm] = useState('');
+  const [volNewSongVideoUrl, setVolNewSongVideoUrl] = useState('');
+  const [volNewSongLyricsUrl, setVolNewSongLyricsUrl] = useState('');
+  const [isCreatingVolOnlineSong, setIsCreatingVolOnlineSong] = useState(false);
+
+  const filteredVolunteerSongs = useMemo(() => {
+    const query = volunteerRepertoireQuery.toLowerCase().trim();
+    return songs.filter(s => {
+      const inSetlist = selectedSongsForSetlist.some(ss => ss.id === s.id);
+      if (inSetlist) return false;
+      if (!query) return true;
+      return s.title?.toLowerCase().includes(query) || s.artist?.toLowerCase().includes(query);
+    });
+  }, [songs, volunteerRepertoireQuery, selectedSongsForSetlist]);
+
+  const handleCreateAndAddVolOnlineSong = async () => {
+    if (!volNewSongTitle.trim() || !churchId) return;
+    setIsCreatingVolOnlineSong(true);
+    try {
+      const songData = {
+        church_id: churchId,
+        title: volNewSongTitle.trim(),
+        artist: volNewSongArtist.trim() || 'Desconhecido',
+        key: volNewSongKey.trim() || null,
+        bpm: volNewSongBpm ? parseInt(volNewSongBpm) : null,
+        video_url: volNewSongVideoUrl.trim() || null,
+        lyrics_url: volNewSongLyricsUrl.trim() || null
+      };
+
+      const { data, error } = await supabase
+        .from('songs')
+        .insert(songData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setSongs(prev => [...prev, data]);
+        setSelectedSongsForSetlist(prev => [
+          ...prev,
+          { ...data, custom_key: data.key || '' }
+        ]);
+        setVolNewSongTitle('');
+        setVolNewSongArtist('');
+        setVolNewSongKey('');
+        setVolNewSongBpm('');
+        setVolNewSongVideoUrl('');
+        setVolNewSongLyricsUrl('');
+        setVolunteerRepertoireQuery('');
+        setVolunteerSongSearchTab('repertoire');
+      }
+    } catch (err) {
+      console.error('Erro ao cadastrar música:', err);
+      alert('Erro ao salvar música no repertório.');
+    } finally {
+      setIsCreatingVolOnlineSong(false);
+    }
   };
 
   const handleSaveSetlist = async () => {
@@ -1079,24 +1146,203 @@ export function VolunteerApp() {
                 </div>
 
                 <div className="space-y-4 mb-6 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>Adicionar Música</label>
-                    <select 
-                      onChange={(e) => {
-                        const song = songs.find(s => s.id === e.target.value);
-                        if (song && !selectedSongsForSetlist.find(s => s.id === song.id)) {
-                          setSelectedSongsForSetlist([...selectedSongsForSetlist, { ...song, custom_key: song.key || '' }]);
-                        }
-                        e.target.value = "";
-                      }}
-                      className="w-full text-sm rounded-xl px-4 py-3 outline-none transition-all"
-                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="">Selecione para adicionar...</option>
-                      {songs.map(s => (
-                        <option key={s.id} value={s.id}>{s.title} - {s.artist}</option>
-                      ))}
-                    </select>
+                  {/* Componente Avançado de Busca no Repertório & Cadastro Online */}
+                  <div className="space-y-3 p-3 rounded-2xl border mb-4" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
+                    <div className="flex items-center justify-between gap-2 border-b pb-2" style={{ borderColor: 'var(--border-main)' }}>
+                      <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: 'var(--text-heading)' }}>
+                        Adicionar Músicas
+                      </span>
+                      <div className="flex gap-1 p-0.5 rounded-lg border text-[10px] font-bold" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}>
+                        <button 
+                          type="button"
+                          onClick={() => setVolunteerSongSearchTab('repertoire')}
+                          className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${volunteerSongSearchTab === 'repertoire' ? 'bg-blue-600 text-white font-black' : ''}`}
+                          style={volunteerSongSearchTab !== 'repertoire' ? { color: 'var(--text-secondary)' } : {}}
+                        >
+                          Repertório
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setVolunteerSongSearchTab('online')}
+                          className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${volunteerSongSearchTab === 'online' ? 'bg-blue-600 text-white font-black' : ''}`}
+                          style={volunteerSongSearchTab !== 'online' ? { color: 'var(--text-secondary)' } : {}}
+                        >
+                          <Globe size={11} /> Nova / Internet
+                        </button>
+                      </div>
+                    </div>
+
+                    {volunteerSongSearchTab === 'repertoire' ? (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-3 top-3" style={{ color: 'var(--text-secondary)' }} />
+                          <input 
+                            type="text"
+                            value={volunteerRepertoireQuery}
+                            onChange={(e) => setVolunteerRepertoireQuery(e.target.value)}
+                            placeholder="Buscar título ou artista..."
+                            className="w-full text-xs rounded-xl pl-9 pr-3 py-2 border outline-none transition-all"
+                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+
+                        <div className="max-h-44 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                          {filteredVolunteerSongs.length > 0 ? (
+                            filteredVolunteerSongs.map(s => (
+                              <div 
+                                key={s.id}
+                                className="flex justify-between items-center p-2 rounded-xl border hover:border-blue-500/50 transition-all text-xs cursor-pointer group"
+                                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}
+                                onClick={() => setSelectedSongsForSetlist([...selectedSongsForSetlist, { ...s, custom_key: s.key || '' }])}
+                              >
+                                <div className="min-w-0 flex-1 pr-2">
+                                  <p className="font-bold truncate" style={{ color: 'var(--text-heading)' }}>{s.title}</p>
+                                  <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{s.artist}</p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {s.key && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                                      {s.key}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-black text-blue-500 opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                                    <Plus size={14} /> Adicionar
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-3 text-center">
+                              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Nenhuma música encontrada.</p>
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  setVolNewSongTitle(volunteerRepertoireQuery);
+                                  setVolunteerSongSearchTab('online');
+                                }}
+                                className="mt-1.5 text-xs font-bold text-blue-500 hover:underline cursor-pointer"
+                              >
+                                Buscar ou Criar "{volunteerRepertoireQuery}" na Internet →
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Tab: Cadastrar/Buscar na Internet */
+                      <div className="space-y-2.5">
+                        <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                          Cadastre a música no banco do louvor para salvá-la permanentemente e usá-la no setlist:
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Título *</label>
+                            <input 
+                              type="text"
+                              value={volNewSongTitle}
+                              onChange={(e) => setVolNewSongTitle(e.target.value)}
+                              placeholder="Ex: Bondade de Deus"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Artista / Banda</label>
+                            <input 
+                              type="text"
+                              value={volNewSongArtist}
+                              onChange={(e) => setVolNewSongArtist(e.target.value)}
+                              placeholder="Ex: Isaías Saad"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Tom Padrão</label>
+                            <input 
+                              type="text"
+                              value={volNewSongKey}
+                              onChange={(e) => setVolNewSongKey(e.target.value)}
+                              placeholder="Ex: G#, Bb"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>BPM (Andamento)</label>
+                            <input 
+                              type="number"
+                              value={volNewSongBpm}
+                              onChange={(e) => setVolNewSongBpm(e.target.value)}
+                              placeholder="Ex: 72"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Link da Cifra (Cifra Club)</label>
+                          <input 
+                            type="url"
+                            value={volNewSongLyricsUrl}
+                            onChange={(e) => setVolNewSongLyricsUrl(e.target.value)}
+                            placeholder="https://www.cifraclub.com.br/..."
+                            className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Link do Vídeo / YouTube</label>
+                          <input 
+                            type="url"
+                            value={volNewSongVideoUrl}
+                            onChange={(e) => setVolNewSongVideoUrl(e.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=..."
+                            className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+
+                        {/* Atalhos para Pesquisar na Web */}
+                        {volNewSongTitle && (
+                          <div className="flex gap-2 pt-0.5">
+                            <a 
+                              href={`https://www.cifraclub.com.br/?q=${encodeURIComponent(volNewSongTitle + ' ' + volNewSongArtist)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer hover:opacity-90"
+                              style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}
+                            >
+                              <Music size={12} /> Cifra Club ↗
+                            </a>
+                            <a 
+                              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(volNewSongTitle + ' ' + volNewSongArtist)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer hover:opacity-90"
+                              style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}
+                            >
+                              <Youtube size={12} /> YouTube ↗
+                            </a>
+                          </div>
+                        )}
+
+                        <button 
+                          type="button"
+                          onClick={handleCreateAndAddVolOnlineSong}
+                          disabled={isCreatingVolOnlineSong || !volNewSongTitle.trim()}
+                          className="w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <Plus size={14} /> {isCreatingVolOnlineSong ? 'Salvando...' : 'Salvar no Repertório & Adicionar'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">

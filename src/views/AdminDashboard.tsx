@@ -28,6 +28,7 @@ import {
   Pencil,
   X,
   Camera,
+  Globe,
   CalendarDays,
   ChevronLeft,
   RefreshCw,
@@ -2046,6 +2047,17 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
   const [setlistModalSongs, setSetlistModalSongs] = useState<any[]>([]);
   const [isSavingSetlistModal, setIsSavingSetlistModal] = useState(false);
 
+  // Setlist Repertoire & Online Search States
+  const [songSearchTab, setSongSearchTab] = useState<'repertoire' | 'online'>('repertoire');
+  const [repertoireQuery, setRepertoireQuery] = useState('');
+  const [newSongTitle, setNewSongTitle] = useState('');
+  const [newSongArtist, setNewSongArtist] = useState('');
+  const [newSongKey, setNewSongKey] = useState('');
+  const [newSongBpm, setNewSongBpm] = useState('');
+  const [newSongVideoUrl, setNewSongVideoUrl] = useState('');
+  const [newSongLyricsUrl, setNewSongLyricsUrl] = useState('');
+  const [isCreatingOnlineSong, setIsCreatingOnlineSong] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -2527,6 +2539,61 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
       alert('Erro ao salvar setlist.');
     } finally {
       setIsSavingSetlistModal(false);
+    }
+  };
+
+  const filteredRepertoireSongs = useMemo(() => {
+    const query = repertoireQuery.toLowerCase().trim();
+    return allSongs.filter(s => {
+      const inSetlist = setlistModalSongs.some(ss => ss.id === s.id);
+      if (inSetlist) return false;
+      if (!query) return true;
+      return s.title?.toLowerCase().includes(query) || s.artist?.toLowerCase().includes(query);
+    });
+  }, [allSongs, repertoireQuery, setlistModalSongs]);
+
+  const handleCreateAndAddOnlineSong = async () => {
+    if (!newSongTitle.trim() || !churchId) return;
+    setIsCreatingOnlineSong(true);
+    try {
+      const songData = {
+        church_id: churchId,
+        title: newSongTitle.trim(),
+        artist: newSongArtist.trim() || 'Desconhecido',
+        key: newSongKey.trim() || null,
+        bpm: newSongBpm ? parseInt(newSongBpm) : null,
+        video_url: newSongVideoUrl.trim() || null,
+        lyrics_url: newSongLyricsUrl.trim() || null
+      };
+
+      const { data, error } = await supabase
+        .from('songs')
+        .insert(songData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setAllSongs(prev => [...prev, data]);
+        setSetlistModalSongs(prev => [
+          ...prev,
+          { ...data, custom_key: data.key || '' }
+        ]);
+        setNewSongTitle('');
+        setNewSongArtist('');
+        setNewSongKey('');
+        setNewSongBpm('');
+        setNewSongVideoUrl('');
+        setNewSongLyricsUrl('');
+        setRepertoireQuery('');
+        setSongSearchTab('repertoire');
+      }
+    } catch (err) {
+      console.error('Erro ao cadastrar música:', err);
+      alert('Erro ao salvar música no repertório da igreja.');
+    } finally {
+      setIsCreatingOnlineSong(false);
     }
   };
 
@@ -3306,28 +3373,203 @@ function ScheduleView({ canSeeSongs }: { canSeeSongs: boolean }) {
               {setlistModalIsEditable ? (
                 /* Modo Edição (Líderes de Louvor e Administradores) */
                 <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 ml-1" style={{ color: 'var(--text-secondary)' }}>
-                      Adicionar Música ao Repertório
-                    </label>
-                    <select 
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addSongToDedicatedSetlist(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="w-full text-sm rounded-xl px-4 py-3 outline-none transition-all"
-                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="">Selecione para adicionar...</option>
-                      {allSongs
-                        .filter(s => !setlistModalSongs.find(ss => ss.id === s.id))
-                        .map(s => (
-                          <option key={s.id} value={s.id}>{s.title} - {s.artist}</option>
-                        ))
-                      }
-                    </select>
+                  {/* Componente Avançado de Busca no Repertório & Cadastro Online */}
+                  <div className="space-y-3 p-3 rounded-2xl border mb-4" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)' }}>
+                    <div className="flex items-center justify-between gap-2 border-b pb-2" style={{ borderColor: 'var(--border-main)' }}>
+                      <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: 'var(--text-heading)' }}>
+                        Adicionar Músicas
+                      </span>
+                      <div className="flex gap-1 p-0.5 rounded-lg border text-[10px] font-bold" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}>
+                        <button 
+                          type="button"
+                          onClick={() => setSongSearchTab('repertoire')}
+                          className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${songSearchTab === 'repertoire' ? 'bg-blue-600 text-white font-black' : ''}`}
+                          style={songSearchTab !== 'repertoire' ? { color: 'var(--text-secondary)' } : {}}
+                        >
+                          Repertório
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setSongSearchTab('online')}
+                          className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${songSearchTab === 'online' ? 'bg-blue-600 text-white font-black' : ''}`}
+                          style={songSearchTab !== 'online' ? { color: 'var(--text-secondary)' } : {}}
+                        >
+                          <Globe size={11} /> Nova / Internet
+                        </button>
+                      </div>
+                    </div>
+
+                    {songSearchTab === 'repertoire' ? (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-3 top-3" style={{ color: 'var(--text-secondary)' }} />
+                          <input 
+                            type="text"
+                            value={repertoireQuery}
+                            onChange={(e) => setRepertoireQuery(e.target.value)}
+                            placeholder="Buscar título ou artista no repertório..."
+                            className="w-full text-xs rounded-xl pl-9 pr-3 py-2 border outline-none transition-all"
+                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+
+                        <div className="max-h-44 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                          {filteredRepertoireSongs.length > 0 ? (
+                            filteredRepertoireSongs.map(s => (
+                              <div 
+                                key={s.id}
+                                className="flex justify-between items-center p-2 rounded-xl border hover:border-blue-500/50 transition-all text-xs cursor-pointer group"
+                                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}
+                                onClick={() => addSongToDedicatedSetlist(s.id)}
+                              >
+                                <div className="min-w-0 flex-1 pr-2">
+                                  <p className="font-bold truncate" style={{ color: 'var(--text-heading)' }}>{s.title}</p>
+                                  <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{s.artist}</p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {s.key && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                                      {s.key}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-black text-blue-500 opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                                    <Plus size={14} /> Adicionar
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-3 text-center">
+                              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Nenhuma música encontrada no repertório.</p>
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  setNewSongTitle(repertoireQuery);
+                                  setSongSearchTab('online');
+                                }}
+                                className="mt-1.5 text-xs font-bold text-blue-500 hover:underline cursor-pointer"
+                              >
+                                Buscar ou Criar "{repertoireQuery}" na Internet →
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Tab: Cadastrar/Buscar na Internet */
+                      <div className="space-y-2.5">
+                        <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                          Cadastre a música no banco de dados do louvor para salvá-la permanentemente e usá-la no setlist:
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Título *</label>
+                            <input 
+                              type="text"
+                              value={newSongTitle}
+                              onChange={(e) => setNewSongTitle(e.target.value)}
+                              placeholder="Ex: Bondade de Deus"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Artista / Banda</label>
+                            <input 
+                              type="text"
+                              value={newSongArtist}
+                              onChange={(e) => setNewSongArtist(e.target.value)}
+                              placeholder="Ex: Isaías Saad"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Tom Padrão</label>
+                            <input 
+                              type="text"
+                              value={newSongKey}
+                              onChange={(e) => setNewSongKey(e.target.value)}
+                              placeholder="Ex: G#, Bb"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>BPM (Andamento)</label>
+                            <input 
+                              type="number"
+                              value={newSongBpm}
+                              onChange={(e) => setNewSongBpm(e.target.value)}
+                              placeholder="Ex: 72"
+                              className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                              style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Link da Cifra (Cifra Club)</label>
+                          <input 
+                            type="url"
+                            value={newSongLyricsUrl}
+                            onChange={(e) => setNewSongLyricsUrl(e.target.value)}
+                            placeholder="https://www.cifraclub.com.br/..."
+                            className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-black uppercase tracking-wider block mb-1" style={{ color: 'var(--text-secondary)' }}>Link do Vídeo / YouTube</label>
+                          <input 
+                            type="url"
+                            value={newSongVideoUrl}
+                            onChange={(e) => setNewSongVideoUrl(e.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=..."
+                            className="w-full text-xs rounded-xl px-3 py-1.5 border outline-none"
+                            style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+
+                        {/* Atalhos para Pesquisar na Web */}
+                        {newSongTitle && (
+                          <div className="flex gap-2 pt-0.5">
+                            <a 
+                              href={`https://www.cifraclub.com.br/?q=${encodeURIComponent(newSongTitle + ' ' + newSongArtist)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer hover:opacity-90"
+                              style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}
+                            >
+                              <Music size={12} /> Cifra Club ↗
+                            </a>
+                            <a 
+                              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(newSongTitle + ' ' + newSongArtist)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer hover:opacity-90"
+                              style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}
+                            >
+                              <Youtube size={12} /> YouTube ↗
+                            </a>
+                          </div>
+                        )}
+
+                        <button 
+                          type="button"
+                          onClick={handleCreateAndAddOnlineSong}
+                          disabled={isCreatingOnlineSong || !newSongTitle.trim()}
+                          className="w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <Plus size={14} /> {isCreatingOnlineSong ? 'Salvando...' : 'Salvar no Repertório & Adicionar'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
