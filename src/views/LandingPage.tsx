@@ -2,12 +2,12 @@ import { useState, useRef, useEffect, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   CalendarCheck, Music, Megaphone, Heart, ChevronDown, Check, Star, 
-  Church, Menu, X, ArrowRight, XCircle, Users, Zap, Shield, Globe, MessageCircle, Sun, Moon
+  Church, Menu, X, ArrowRight, XCircle, Users, Zap, Shield, Globe, MessageCircle, Sun, Moon, LogIn
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface LandingPageProps {
-  onNavigateToApp: () => void;
+  onNavigateToApp: (mode?: 'login' | 'register_church' | 'register_volunteer') => void;
 }
 
 function AnimatedSection({ children, delay = 0, className = '', ...rest }: { children: ReactNode, delay?: number, className?: string, [key: string]: any }) {
@@ -110,7 +110,7 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
             <button onClick={() => scrollToSection('faq')} className="text-sm font-medium text-slate-light hover:text-accent-cyan transition-colors">FAQ</button>
           </div>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
             <button
               onClick={toggleTheme}
               className="p-2 rounded-xl text-slate-gray hover:text-slate-light hover:bg-navy-800 transition-colors"
@@ -119,8 +119,14 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button 
-              onClick={onNavigateToApp}
-              className="bg-accent-cyan/10 hover:bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 shadow-[0_0_15px_rgba(100,255,218,0.1)] hover:shadow-[0_0_25px_rgba(100,255,218,0.2)]"
+              onClick={() => onNavigateToApp('login')}
+              className="px-4 py-2 rounded-xl text-sm font-bold text-slate-light hover:text-accent-cyan transition-colors cursor-pointer"
+            >
+              Entrar
+            </button>
+            <button 
+              onClick={() => onNavigateToApp('register_church')}
+              className="bg-accent-cyan/10 hover:bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 shadow-[0_0_15px_rgba(100,255,218,0.1)] hover:shadow-[0_0_25px_rgba(100,255,218,0.2)] cursor-pointer"
             >
               Começar Grátis
             </button>
@@ -149,10 +155,16 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
                 <button onClick={() => scrollToSection('como-funciona')} className="text-left text-base font-medium text-slate-light p-2 hover:bg-navy-800 rounded-lg">Como Funciona</button>
                 <button onClick={() => scrollToSection('faq')} className="text-left text-base font-medium text-slate-light p-2 hover:bg-navy-800 rounded-lg">FAQ</button>
                 <button 
-                  onClick={onNavigateToApp}
-                  className="mt-4 bg-accent-cyan text-navy-950 px-5 py-3 rounded-xl text-base font-bold text-center w-full"
+                  onClick={() => onNavigateToApp('register_church')}
+                  className="mt-2 bg-accent-cyan text-navy-950 px-5 py-3 rounded-xl text-base font-bold text-center w-full cursor-pointer"
                 >
                   Começar Grátis
+                </button>
+                <button 
+                  onClick={() => onNavigateToApp('login')}
+                  className="bg-navy-800 text-slate-light border border-navy-700 px-5 py-3 rounded-xl text-base font-semibold text-center w-full flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <LogIn size={18} /> Entrar no Sistema
                 </button>
               </div>
             </motion.div>
@@ -187,14 +199,21 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
               <button 
-                onClick={onNavigateToApp}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent-cyan hover:bg-accent-cyan/90 text-navy-950 px-8 py-4 rounded-xl text-base font-bold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_10px_40px_-10px_rgba(100,255,218,0.5)]"
+                onClick={() => onNavigateToApp('register_church')}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent-cyan hover:bg-accent-cyan/90 text-navy-950 px-8 py-4 rounded-xl text-base font-bold transition-all duration-300 transform hover:-translate-y-1 shadow-lg cursor-pointer"
+                style={{ backgroundColor: '#2563EB', color: '#FFFFFF' }}
               >
                 Comece seu Teste Grátis <ArrowRight size={18} />
               </button>
               <button 
+                onClick={() => onNavigateToApp('login')}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-navy-800/80 hover:bg-navy-800 text-slate-light border border-navy-700 px-8 py-4 rounded-xl text-base font-semibold transition-all duration-300 cursor-pointer shadow-md"
+              >
+                <LogIn size={18} /> Entrar no Sistema
+              </button>
+              <button 
                 onClick={() => scrollToSection('recursos')}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-transparent hover:bg-navy-800 text-slate-light border border-navy-700 px-8 py-4 rounded-xl text-base font-semibold transition-all duration-300"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-transparent hover:bg-navy-800/40 text-slate-gray hover:text-slate-light border border-slate-700/50 px-6 py-4 rounded-xl text-base font-medium transition-all duration-300 cursor-pointer"
               >
                 Ver Recursos
               </button>
@@ -388,8 +407,8 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
                 Em menos de 10 minutos, sua igreja sai do caos do grupo de WhatsApp<br className="hidden md:block"/> para um sistema profissional.
               </p>
               <button 
-                onClick={onNavigateToApp}
-                className="bg-navy-800 hover:bg-navy-700 text-white border border-navy-600 px-8 py-4 rounded-xl text-base font-semibold transition-all duration-300"
+                onClick={() => onNavigateToApp('register_church')}
+                className="bg-navy-800 hover:bg-navy-700 text-white border border-navy-600 px-8 py-4 rounded-xl text-base font-semibold transition-all duration-300 cursor-pointer"
               >
                 Criar conta da minha igreja agora
               </button>
@@ -451,13 +470,21 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
                 Pare de perder tempo cobrando escalas e organizando planilhas. Foque no pastoreio e deixe a gestão com o Church+.
               </p>
               
-              <button 
-                onClick={onNavigateToApp}
-                className="inline-flex items-center justify-center gap-2 px-10 py-5 rounded-xl text-lg font-bold transition-all duration-300 transform hover:-translate-y-1 shadow-xl mb-10 w-full sm:w-auto cursor-pointer hover:brightness-110 active:scale-95"
-                style={{ backgroundColor: '#64FFDA', color: '#050C16' }}
-              >
-                Teste o Church+ Grátis por 14 Dias <ArrowRight size={20} style={{ color: '#050C16' }} />
-              </button>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+                <button 
+                  onClick={() => onNavigateToApp('register_church')}
+                  className="inline-flex items-center justify-center gap-2 px-10 py-5 rounded-xl text-lg font-bold transition-all duration-300 transform hover:-translate-y-1 shadow-xl w-full sm:w-auto cursor-pointer hover:brightness-110 active:scale-95"
+                  style={{ backgroundColor: '#64FFDA', color: '#050C16' }}
+                >
+                  Teste o Church+ Grátis por 14 Dias <ArrowRight size={20} style={{ color: '#050C16' }} />
+                </button>
+                <button 
+                  onClick={() => onNavigateToApp('login')}
+                  className="inline-flex items-center justify-center gap-2 px-8 py-5 rounded-xl text-lg font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-all duration-300 w-full sm:w-auto cursor-pointer"
+                >
+                  <LogIn size={20} /> Entrar no Sistema
+                </button>
+              </div>
 
               <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-semibold text-white/90">
                 <span className="flex items-center gap-2"><Check size={18} style={{ color: '#64FFDA' }} /> Cadastro em 2 min</span>

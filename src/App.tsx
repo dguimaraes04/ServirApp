@@ -22,6 +22,7 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(false);
   const [showLanding, setShowLanding] = useState(true);
+  const [authMode, setAuthMode] = useState<'login' | 'register_church' | 'register_volunteer'>('register_church');
 
   const fetchProfile = useCallback(async (userId: string, retries = 10, delayMs = 500) => {
     setProfileLoading(true);
@@ -97,9 +98,16 @@ export default function App() {
 
   if (!session) {
     if (showLanding) {
-      return <LandingPage onNavigateToApp={() => setShowLanding(false)} />;
+      return (
+        <LandingPage 
+          onNavigateToApp={(mode = 'register_church') => {
+            setAuthMode(mode);
+            setShowLanding(false);
+          }} 
+        />
+      );
     }
-    return <Auth onBack={() => setShowLanding(true)} />;
+    return <Auth initialMode={authMode} onBack={() => setShowLanding(true)} />;
   }
 
   // Roteamento baseado no cargo do banco de dados

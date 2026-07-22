@@ -4,11 +4,22 @@ import { Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, Zap, Building, Key, U
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
 
-type AuthMode = 'login' | 'register_church' | 'register_volunteer';
+export type AuthMode = 'login' | 'register_church' | 'register_volunteer';
 
-export function Auth({ onBack }: { onBack?: () => void }) {
+export interface AuthProps {
+  initialMode?: AuthMode;
+  onBack?: () => void;
+}
+
+export function Auth({ initialMode = 'login', onBack }: AuthProps) {
   const { theme } = useTheme();
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(initialMode);
+  
+  useEffect(() => {
+    if (initialMode) {
+      setMode(initialMode);
+    }
+  }, [initialMode]);
   
   // Form fields
   const [email, setEmail] = useState('');
