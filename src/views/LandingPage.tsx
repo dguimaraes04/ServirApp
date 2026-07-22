@@ -434,32 +434,37 @@ export function LandingPage({ onNavigateToApp }: LandingPageProps) {
 
         {/* 7. FINAL CTA SECTION */}
         <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 pointer-events-none">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] rounded-full bg-accent-cyan/10 blur-[120px]" />
           </div>
 
           <div className="max-w-5xl mx-auto px-6 md:px-12 relative z-10">
-            <AnimatedSection className="bg-gradient-to-b from-navy-800/80 to-navy-900/80 backdrop-blur-xl border border-navy-700/50 rounded-3xl p-10 md:p-16 text-center shadow-2xl">
-              <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-6">
+            <AnimatedSection className={`keep-white rounded-3xl p-10 md:p-16 text-center shadow-2xl backdrop-blur-xl border ${
+              theme === 'dark'
+                ? 'bg-gradient-to-b from-navy-800 to-navy-900 border-navy-700/50'
+                : 'bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 border-blue-600/30'
+            }`}>
+              <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-6 tracking-tight">
                 Sua igreja organizada começa com uma decisão
               </h2>
-              <p className="text-xl text-slate-light mb-10 max-w-2xl mx-auto leading-relaxed">
+              <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto leading-relaxed opacity-95">
                 Pare de perder tempo cobrando escalas e organizando planilhas. Foque no pastoreio e deixe a gestão com o Church+.
               </p>
               
               <button 
                 onClick={onNavigateToApp}
-                className="inline-flex items-center justify-center gap-2 bg-accent-cyan hover:bg-accent-cyan/90 text-navy-950 px-10 py-5 rounded-xl text-lg font-bold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_15px_40px_-10px_rgba(100,255,218,0.6)] mb-10 w-full sm:w-auto"
+                className="inline-flex items-center justify-center gap-2 px-10 py-5 rounded-xl text-lg font-bold transition-all duration-300 transform hover:-translate-y-1 shadow-xl mb-10 w-full sm:w-auto cursor-pointer hover:brightness-110 active:scale-95"
+                style={{ backgroundColor: '#64FFDA', color: '#050C16' }}
               >
-                Teste o Church+ Grátis por 14 Dias <ArrowRight size={20} />
+                Teste o Church+ Grátis por 14 Dias <ArrowRight size={20} style={{ color: '#050C16' }} />
               </button>
 
-              <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-medium text-slate-gray">
-                <span className="flex items-center gap-2"><Check size={16} className="text-accent-cyan" /> Cadastro em 2 min</span>
-                <span className="flex items-center gap-2"><Check size={16} className="text-accent-cyan" /> Sem cartão de crédito</span>
-                <span className="flex items-center gap-2"><Check size={16} className="text-accent-cyan" /> Suporte em Português</span>
-                <span className="flex items-center gap-2"><Shield size={16} className="text-accent-cyan" /> Dados Seguros</span>
-                <span className="flex items-center gap-2"><Globe size={16} className="text-accent-cyan" /> 100% Web</span>
+              <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-semibold text-white/90">
+                <span className="flex items-center gap-2"><Check size={18} style={{ color: '#64FFDA' }} /> Cadastro em 2 min</span>
+                <span className="flex items-center gap-2"><Check size={18} style={{ color: '#64FFDA' }} /> Sem cartão de crédito</span>
+                <span className="flex items-center gap-2"><Check size={18} style={{ color: '#64FFDA' }} /> Suporte em Português</span>
+                <span className="flex items-center gap-2"><Shield size={18} style={{ color: '#64FFDA' }} /> Dados Seguros</span>
+                <span className="flex items-center gap-2"><Globe size={18} style={{ color: '#64FFDA' }} /> 100% Web</span>
               </div>
             </AnimatedSection>
           </div>

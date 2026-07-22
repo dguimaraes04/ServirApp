@@ -201,7 +201,7 @@ html.light, html:not(.dark) {
     border-color: #D8B4FE !important;
   }
 
-  /* Keep text white ONLY inside solid accent/primary buttons */
+  /* Keep text white ONLY inside solid accent/primary buttons or dark banners */
   .btn-primary,
   .btn-primary *,
   .bg-accent-cyan,
@@ -213,7 +213,14 @@ html.light, html:not(.dark) {
   .bg-red-500,
   .bg-red-500 *,
   .bg-green-500,
-  .bg-green-500 * {
+  .bg-green-500 *,
+  .keep-white,
+  .keep-white h1,
+  .keep-white h2,
+  .keep-white h3,
+  .keep-white h4,
+  .keep-white p,
+  .keep-white span {
     color: #FFFFFF !important;
   }
 }
