@@ -6,7 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 type AuthMode = 'login' | 'register_church' | 'register_volunteer';
 
-export function Auth() {
+export function Auth({ onBack }: { onBack?: () => void }) {
   const { theme } = useTheme();
   const [mode, setMode] = useState<AuthMode>('login');
   
@@ -370,6 +370,15 @@ export function Auth() {
           <p className="text-center text-xs mt-8 font-medium" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>
             © {new Date().getFullYear()} Church+. Todos os direitos reservados.
           </p>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="mt-4 text-xs font-semibold cursor-pointer transition-colors mx-auto block"
+              style={{ color: 'var(--accent)' }}
+            >
+              ← Voltar para a página inicial
+            </button>
+          )}
         </motion.div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { AdminDashboard } from './views/AdminDashboard';
 import { VolunteerApp } from './views/VolunteerApp';
+import { LandingPage } from './views/LandingPage';
 
 // Tipos baseados na nova estrutura do banco
 type Role = 'manager' | 'leader' | 'volunteer' | null;
@@ -20,6 +21,7 @@ export default function App() {
   const [role, setRole] = useState<Role>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string, retries = 10, delayMs = 500) => {
     setProfileLoading(true);
@@ -94,7 +96,10 @@ export default function App() {
   }
 
   if (!session) {
-    return <Auth />;
+    if (showLanding) {
+      return <LandingPage onNavigateToApp={() => setShowLanding(false)} />;
+    }
+    return <Auth onBack={() => setShowLanding(true)} />;
   }
 
   // Roteamento baseado no cargo do banco de dados

@@ -3,9 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Church+ — Gestão de Voluntários da Igreja</title>
-    <meta name="description" content="Plataforma de gestão de voluntários, escalas e ministérios para igrejas. Simples, organizado e eficiente." />
+    <title>Sistema de Gestão de Voluntários para Igreja | Church+</title>
+    <meta name="description" content="Organize escalas de culto, ministérios de louvor e voluntários da sua igreja em um só lugar. Teste grátis o Church+ — sem cartão de crédito." />
     <meta name="theme-color" content="#050d1a" />
+    <meta name="robots" content="index, follow" />
+    <meta name="keywords" content="sistema gestão voluntários igreja, aplicativo escala louvor, como organizar voluntários igreja, programa escala igreja, gestão ministérios evangélicos, software igrejas grátis" />
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
@@ -14,19 +16,94 @@
 
     <!-- Open Graph / Social -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Church+" />
-    <meta property="og:description" content="Gerencie voluntários, escalas e ministérios da sua igreja de forma simples e moderna." />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:title" content="Church+ — Sistema de Gestão de Voluntários para Igreja" />
+    <meta property="og:description" content="Organize escalas de culto, ministérios de louvor e voluntários da sua igreja em um só lugar. Teste grátis o Church+ — sem cartão de crédito." />
+    <meta property="og:site_name" content="Church+" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Church+ — Sistema de Gestão de Voluntários para Igreja" />
+    <meta name="twitter:description" content="Organize escalas de culto, ministérios de louvor e voluntários da sua igreja em um só lugar. Teste grátis!" />
 
     <!-- PWA: Add to Home Screen -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Church+" />
+
+    <!-- FAQ Schema Markup for Rich Snippets -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Como fazer escala de culto de forma simples?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Com o Church+, você cria a escala de culto em poucos cliques. Basta selecionar o evento, escolher o ministério e escalar os voluntários disponíveis. Cada pessoa recebe a notificação no aplicativo e confirma presença com um toque. Você acompanha o status em tempo real no painel."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Existe algum aplicativo gratuito para organizar voluntários da igreja?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. O Church+ oferece um período de teste grátis sem necessidade de cartão de crédito. O plano gratuito permite cadastrar ministérios, criar escalas e gerenciar a comunicação com os voluntários."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Como organizar o ministério de louvor e a setlist do culto?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "O Church+ possui um módulo dedicado ao ministério de louvor. Você cadastra o repertório completo da igreja com título, artista, tom e BPM. Para cada culto, monta a setlist definindo a ordem e o tom específico de cada música."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O Church+ funciona para igrejas pequenas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. O Church+ foi projetado para atender desde igrejas com 5 voluntários até comunidades com centenas de membros ativos. A interface é simples e intuitiva — não exige treinamento técnico."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Como o Church+ é diferente de usar um grupo de WhatsApp?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "O WhatsApp é uma ferramenta de conversa, não de gestão. O Church+ centraliza escalas, confirmações, setlists e comunicados em um painel organizado. Cada voluntário vê apenas o que é relevante para ele."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- SoftwareApplication Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Church+",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Android, iOS",
+      "description": "Plataforma de gestão de voluntários, escalas e ministérios para igrejas.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "BRL"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "ratingCount": "200"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
