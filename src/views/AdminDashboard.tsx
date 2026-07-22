@@ -439,6 +439,40 @@ function DashboardView() {
   const [isSubmittingAnon, setIsSubmittingAnon] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
+  // Church Name Edit State
+  const [isChurchNameModalOpen, setIsChurchNameModalOpen] = useState(false);
+  const [editChurchNameInput, setEditChurchNameInput] = useState('');
+  const [isSavingChurchName, setIsSavingChurchName] = useState(false);
+  const [churchNameMsg, setChurchNameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleUpdateChurchName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = editChurchNameInput.trim();
+    if (!trimmed || !churchId) return;
+
+    setIsSavingChurchName(true);
+    setChurchNameMsg(null);
+
+    try {
+      const { error } = await supabase
+        .from('churches')
+        .update({ name: trimmed })
+        .eq('id', churchId);
+
+      if (error) throw error;
+
+      setChurchName(trimmed);
+      setIsChurchNameModalOpen(false);
+      setChurchNameMsg({ type: 'success', text: 'Nome da igreja atualizado com sucesso!' });
+      setTimeout(() => setChurchNameMsg(null), 4000);
+    } catch (err: any) {
+      console.error('Erro ao atualizar nome da igreja:', err);
+      setChurchNameMsg({ type: 'error', text: err.message || 'Erro ao atualizar o nome da igreja.' });
+    } finally {
+      setIsSavingChurchName(false);
+    }
+  };
+
   useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
@@ -725,11 +759,38 @@ function DashboardView() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header>
-        <p className="text-[10px] font-black text-slate-gray uppercase tracking-[0.25em] mb-1">Painel da Igreja</p>
-        <h2 className="text-3xl sm:text-4xl font-display font-black text-white tracking-tighter leading-none">
-          {churchName || 'Sua Igreja'}
-        </h2>
+      <header className="space-y-2">
+        <p className="text-[10px] font-black text-slate-gray uppercase tracking-[0.25em]">Painel da Igreja</p>
+        <div className="flex items-center gap-3">
+          <h2 className="text-3xl sm:text-4xl font-display font-black text-white tracking-tighter leading-none">
+            {churchName || 'Sua Igreja'}
+          </h2>
+          {(userRole === 'manager' || userRole === 'leader') && (
+            <button
+              onClick={() => {
+                setEditChurchNameInput(churchName);
+                setChurchNameMsg(null);
+                setIsChurchNameModalOpen(true);
+              }}
+              className="p-2 rounded-xl bg-navy-800/60 hover:bg-navy-800 text-slate-gray hover:text-accent-cyan transition-all border border-navy-700/50 cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+              title="Editar nome da igreja"
+            >
+              <Pencil size={16} />
+              <span className="hidden sm:inline">Editar Nome</span>
+            </button>
+          )}
+        </div>
+
+        {churchNameMsg && (
+          <div className={`mt-3 p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
+            churchNameMsg.type === 'success' ? 'bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan' : 'bg-red-500/10 border border-red-500/30 text-red-400'
+          }`}>
+            <span>{churchNameMsg.text}</span>
+            <button onClick={() => setChurchNameMsg(null)} className="cursor-pointer opacity-70 hover:opacity-100">
+              <X size={14} />
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Stat: Volunteers */}
@@ -1418,6 +1479,77 @@ function DashboardView() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Edição do Nome da Igreja */}
+      <AnimatePresence>
+        {isChurchNameModalOpen && (
+          <div 
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50"
+            onClick={() => setIsChurchNameModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-card w-full max-w-md p-6 md:p-8 rounded-3xl relative border border-navy-700 shadow-2xl"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)' }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsChurchNameModalOpen(false)}
+                className="absolute top-6 right-6 p-2 rounded-xl text-slate-gray hover:text-white hover:bg-navy-800 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex items-center gap-3.5 mb-6">
+                <div className="w-11 h-11 rounded-2xl bg-accent-cyan/10 border border-accent-cyan/20 flex items-center justify-center text-accent-cyan flex-shrink-0">
+                  <Building size={22} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-display font-black text-white leading-tight">Editar Nome da Igreja</h3>
+                  <p className="text-xs text-slate-gray">Altere o nome oficial da sua congregação</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateChurchName} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-gray uppercase tracking-wider mb-2">
+                    Nome da Igreja
+                  </label>
+                  <input
+                    type="text"
+                    value={editChurchNameInput}
+                    onChange={(e) => setEditChurchNameInput(e.target.value)}
+                    placeholder="Ex: Igreja Evangélica Central"
+                    className="theme-input text-base font-semibold py-3 px-4 rounded-xl border border-navy-700 w-full"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4" style={{ borderTop: '1px solid var(--border-main)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsChurchNameModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-slate-gray hover:text-white hover:bg-navy-800 transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingChurchName || !editChurchNameInput.trim()}
+                    className="btn-primary px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingChurchName ? 'Salvando...' : 'Salvar Alterações'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
