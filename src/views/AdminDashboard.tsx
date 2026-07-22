@@ -427,6 +427,18 @@ function DashboardView() {
   const [eventColor, setEventColor] = useState<string>('#64FFDA');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
+  // Announcements State in DashboardView
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [leadMinistriesIds, setLeadMinistriesIds] = useState<string[]>([]);
+  const [activeAnonTab, setActiveAnonTab] = useState<string>('all');
+  const [isAnonModalOpen, setIsAnonModalOpen] = useState(false);
+  const [anonTitle, setAnonTitle] = useState('');
+  const [anonContent, setAnonContent] = useState('');
+  const [anonPriority, setAnonPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
+  const [anonTargetMinistryId, setAnonTargetMinistryId] = useState<string>('');
+  const [isSubmittingAnon, setIsSubmittingAnon] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+
   useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
@@ -443,24 +455,34 @@ function DashboardView() {
     if (profile) {
       setChurchId(profile.church_id);
       setUserRole(profile.role);
+      setCurrentUserId(sessionData.session.user.id);
       const [
         { count: volCount },
         { data: upcomingEvents },
         { data: mins },
         { data: church },
-        { data: allEvents }
+        { data: allEvents },
+        { data: annons },
+        { data: myLedMins }
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('church_id', profile.church_id),
         supabase.from('events').select('*').eq('church_id', profile.church_id).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(5),
         supabase.from('ministries').select('*').eq('church_id', profile.church_id).order('name'),
         supabase.from('churches').select('name').eq('id', profile.church_id).single(),
-        supabase.from('events').select('id, date, color, title, description, recurring_event_id').eq('church_id', profile.church_id)
+        supabase.from('events').select('id, date, color, title, description, recurring_event_id').eq('church_id', profile.church_id),
+        supabase.from('announcements')
+          .select('*, author:profiles(*), ministry:ministries(*)')
+          .eq('church_id', profile.church_id)
+          .order('created_at', { ascending: false }),
+        supabase.from('ministry_leaders').select('ministry_id').eq('profile_id', sessionData.session.user.id)
       ]);
 
       setStats({ volunteers: volCount || 0 });
       setNextEvents(upcomingEvents || []);
       setMinistries(mins || []);
       setDashboardEvents(allEvents || []);
+      if (annons) setAnnouncements(annons);
+      if (myLedMins) setLeadMinistriesIds(myLedMins.map(m => m.ministry_id));
       if (church) setChurchName(church.name || '');
       if (allEvents) {
         const dates = new Set(allEvents.map((e: any) => e.date.split('T')[0]));
@@ -615,6 +637,63 @@ function DashboardView() {
     }
     setIsCreatingEvent(false);
   };
+
+  const handlePublishAnnouncementDashboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!anonTitle.trim() || !anonContent.trim() || !churchId || !currentUserId) return;
+    setIsSubmittingAnon(true);
+
+    try {
+      const payload = {
+        church_id: churchId,
+        author_id: currentUserId,
+        ministry_id: anonTargetMinistryId || null,
+        title: anonTitle.trim(),
+        content: anonContent.trim(),
+        priority: anonPriority
+      };
+
+      const { error } = await supabase.from('announcements').insert(payload);
+      if (error) throw error;
+
+      setAnonTitle('');
+      setAnonContent('');
+      setAnonPriority('normal');
+      setAnonTargetMinistryId('');
+      setIsAnonModalOpen(false);
+      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao publicar aviso.');
+    } finally {
+      setIsSubmittingAnon(false);
+    }
+  };
+
+  const handleDeleteAnnouncementDashboard = async (id: string) => {
+    if (window.confirm('Excluir este aviso do mural?')) {
+      await supabase.from('announcements').delete().eq('id', id);
+      fetchDashboardData();
+    }
+  };
+
+  const canCreateAnon = userRole === 'manager' || userRole === 'leader' || leadMinistriesIds.length > 0;
+
+  const targetMinistryOptionsDashboard = useMemo(() => {
+    if (userRole === 'manager') {
+      return [{ id: '', name: '📢 Todos os Voluntários (Geral)' }, ...ministries.map(m => ({ id: m.id, name: `🏛️ ${m.name}` }))];
+    }
+    const myLed = ministries.filter(m => leadMinistriesIds.includes(m.id));
+    return myLed.map(m => ({ id: m.id, name: `🏛️ ${m.name}` }));
+  }, [userRole, ministries, leadMinistriesIds]);
+
+  const filteredAnnouncementsDashboard = useMemo(() => {
+    return announcements.filter(a => {
+      if (activeAnonTab === 'all') return true;
+      if (activeAnonTab === 'general') return a.ministry_id === null;
+      return a.ministry_id === activeAnonTab;
+    });
+  }, [announcements, activeAnonTab]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -823,6 +902,273 @@ function DashboardView() {
           </div>
         )}
       </section>
+
+      {/* Mural de Avisos da Igreja na Dashboard */}
+      <section className="glass-card p-6 md:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-navy-800 pb-4">
+          <div>
+            <h3 className="text-xl font-display font-black text-white uppercase tracking-tight flex items-center gap-2.5">
+              <Megaphone className="text-accent-cyan" size={24} /> Mural de Avisos
+            </h3>
+            <p className="text-slate-gray text-xs mt-0.5">Recados oficiais e comunicados para os voluntários da igreja.</p>
+          </div>
+          {canCreateAnon && (
+            <button
+              onClick={() => {
+                if (targetMinistryOptionsDashboard.length > 0) {
+                  setAnonTargetMinistryId(targetMinistryOptionsDashboard[0].id);
+                }
+                setIsAnonModalOpen(true);
+              }}
+              className="flex items-center gap-2 py-2 px-4 text-xs font-black uppercase tracking-wider text-navy-950 bg-accent-cyan hover:bg-accent-cyan/80 rounded-xl cursor-pointer transition-all shadow-md"
+            >
+              <Plus size={16} /> Novo Aviso
+            </button>
+          )}
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          <button
+            onClick={() => setActiveAnonTab('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeAnonTab === 'all'
+                ? 'bg-accent-cyan text-navy-950 font-black'
+                : 'bg-navy-900/60 border border-navy-800 text-slate-300 hover:border-navy-700'
+            }`}
+          >
+            Todos ({announcements.length})
+          </button>
+          <button
+            onClick={() => setActiveAnonTab('general')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeAnonTab === 'general'
+                ? 'bg-accent-cyan text-navy-950 font-black'
+                : 'bg-navy-900/60 border border-navy-800 text-slate-300 hover:border-navy-700'
+            }`}
+          >
+            📢 Geral da Igreja ({announcements.filter(a => !a.ministry_id).length})
+          </button>
+          {ministries.map(m => {
+            const count = announcements.filter(a => a.ministry_id === m.id).length;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setActiveAnonTab(m.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  activeAnonTab === m.id
+                    ? 'bg-accent-cyan text-navy-950 font-black'
+                    : 'bg-navy-900/60 border border-navy-800 text-slate-300 hover:border-navy-700'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
+                {m.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Feed of Cards */}
+        {filteredAnnouncementsDashboard.length === 0 ? (
+          <div className="py-12 border-2 border-dashed border-navy-800 rounded-2xl text-center space-y-2">
+            <Megaphone size={32} className="mx-auto text-slate-600 opacity-40" />
+            <p className="text-slate-400 font-medium text-xs">Nenhum aviso publicado para esta categoria.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredAnnouncementsDashboard.map(item => {
+              const isManager = userRole === 'manager';
+              const isAuthor = item.author_id === currentUserId;
+              const canDelete = isManager || isAuthor;
+
+              let priorityBadge = { bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20', text: '📌 AVISO' };
+              if (item.priority === 'urgent') priorityBadge = { bg: 'bg-red-500/15 text-red-400 border-red-500/30', text: '🚨 URGENTE' };
+              if (item.priority === 'important') priorityBadge = { bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30', text: '⚠️ IMPORTANTE' };
+
+              return (
+                <div
+                  key={item.id}
+                  className="bg-navy-900/40 border border-navy-800 hover:border-navy-700 rounded-2xl p-5 transition-all flex flex-col justify-between space-y-3 glass-card-subtle"
+                  style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-main)' }}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border ${priorityBadge.bg}`}>
+                          {priorityBadge.text}
+                        </span>
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-lg border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                          {item.ministry ? `🏛️ ${item.ministry.name}` : '📢 Todos os Voluntários'}
+                        </span>
+                      </div>
+
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDeleteAnnouncementDashboard(item.id)}
+                          className="p-1 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                          title="Excluir aviso"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <h4 className="text-base font-display font-black tracking-tight mb-1" style={{ color: 'var(--text-heading)' }}>
+                      {item.title}
+                    </h4>
+
+                    <p className="text-xs whitespace-pre-line leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                      {item.content}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t flex items-center justify-between text-[11px]" style={{ borderColor: 'var(--border-main)' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-navy-800 overflow-hidden border flex items-center justify-center font-bold text-accent-cyan text-[10px]" style={{ borderColor: 'var(--border-main)' }}>
+                        {item.author?.avatar_url ? (
+                          <img src={item.author.avatar_url} alt={item.author.full_name} className="w-full h-full object-cover" />
+                        ) : (
+                          item.author?.full_name?.charAt(0) || 'U'
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold leading-none" style={{ color: 'var(--text-heading)' }}>{item.author?.full_name || 'Membro'}</p>
+                        <p className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-secondary)' }}>
+                          {item.author?.role === 'manager' ? 'Pastor / Gerente' : item.author?.role === 'leader' ? 'Líder' : 'Voluntário'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Modal Novo Aviso (Dashboard) */}
+      <AnimatePresence>
+        {isAnonModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsAnonModalOpen(false)}
+              className="absolute inset-0 bg-navy-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card p-6 md:p-8 w-full max-w-lg relative z-10 overflow-hidden"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-main)' }}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2">
+                  <Megaphone size={22} style={{ color: 'var(--accent)' }} />
+                  <h3 className="text-xl font-display font-black uppercase tracking-tight" style={{ color: 'var(--text-heading)' }}>
+                    Publicar Novo Aviso
+                  </h3>
+                </div>
+                <button onClick={() => setIsAnonModalOpen(false)} style={{ color: 'var(--text-secondary)' }} className="p-1 cursor-pointer">
+                  <XCircle size={22} />
+                </button>
+              </div>
+
+              <form onSubmit={handlePublishAnnouncementDashboard} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Canal / Destino do Aviso
+                  </label>
+                  <select
+                    value={anonTargetMinistryId}
+                    onChange={(e) => setAnonTargetMinistryId(e.target.value)}
+                    className="w-full text-sm rounded-xl px-4 py-3 outline-none border transition-all"
+                    style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                  >
+                    {targetMinistryOptionsDashboard.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Nível de Prioridade
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAnonPriority('normal')}
+                      className={`py-2 rounded-xl text-xs font-black uppercase border transition-all cursor-pointer ${
+                        anonPriority === 'normal' ? 'bg-blue-600 text-white border-blue-500' : 'opacity-60'
+                      }`}
+                    >
+                      📌 Normal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnonPriority('important')}
+                      className={`py-2 rounded-xl text-xs font-black uppercase border transition-all cursor-pointer ${
+                        anonPriority === 'important' ? 'bg-amber-600 text-white border-amber-500' : 'opacity-60'
+                      }`}
+                    >
+                      ⚠️ Importante
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnonPriority('urgent')}
+                      className={`py-2 rounded-xl text-xs font-black uppercase border transition-all cursor-pointer ${
+                        anonPriority === 'urgent' ? 'bg-red-600 text-white border-red-500' : 'opacity-60'
+                      }`}
+                    >
+                      🚨 Urgente
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Título do Aviso *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={anonTitle}
+                    onChange={(e) => setAnonTitle(e.target.value)}
+                    placeholder="Ex: Reunião Geral de Ensaio"
+                    className="w-full text-sm rounded-xl px-4 py-3 outline-none border transition-all"
+                    style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    Mensagem / Detalhes *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={anonContent}
+                    onChange={(e) => setAnonContent(e.target.value)}
+                    placeholder="Escreva a mensagem do aviso..."
+                    className="w-full text-sm rounded-xl px-4 py-3 outline-none border transition-all resize-none"
+                    style={{ background: 'var(--bg-input)', borderColor: 'var(--border-main)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t" style={{ borderColor: 'var(--border-main)' }}>
+                  <button type="button" onClick={() => setIsAnonModalOpen(false)} className="flex-1 py-3 px-4 rounded-xl text-sm font-bold cursor-pointer" style={{ color: 'var(--text-secondary)' }}>Cancelar</button>
+                  <button type="submit" disabled={isSubmittingAnon} className="flex-1 btn-primary text-sm cursor-pointer">
+                    {isSubmittingAnon ? 'Publicando...' : 'Publicar Aviso'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modal: Criar/Editar Evento */}
       <AnimatePresence>
